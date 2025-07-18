@@ -231,17 +231,6 @@ body {
     margin: 0 1px;
 }
 
-/* Green = Reader Notes */
-.highlight.reader-notes {
-    background-color: rgba(76, 175, 80, 0.3);
-    border-bottom: 2px solid rgba(76, 175, 80, 0.6);
-}
-
-.highlight.reader-notes:hover {
-    background-color: rgba(76, 175, 80, 0.5);
-    border-bottom-color: rgba(76, 175, 80, 0.8);
-}
-
 /* Red = Context from Aristo */
 .highlight.aristo-context {
     background-color: rgba(244, 67, 54, 0.3);
@@ -356,11 +345,6 @@ body {
     padding: 0.25rem 0.75rem;
     border-radius: 1rem;
     margin-left: 1rem;
-}
-
-.text-bubble-type.reader-notes {
-    background-color: rgba(76, 175, 80, 0.2);
-    color: rgba(76, 175, 80, 0.9);
 }
 
 .text-bubble-type.aristo-context {
@@ -664,6 +648,54 @@ input[type="range"] {
     line-height: 1.4;
 }
 
+/* Floating Comment Button */
+.floating-comment-btn {
+    position: fixed;
+    right: 100px;
+    top: 30vh;
+    width: 36px;
+    height: 36px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex !important; /* Temporarily always visible for testing */
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow);
+    color: var(--text-color);
+}
+
+.floating-comment-btn:hover {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.floating-comment-btn.show {
+    display: flex;
+}
+
+/* Add pencil icon using CSS */
+.floating-comment-btn::before {
+    content: '';
+    width: 16px;
+    height: 16px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m18 2 4 4-14 14H4v-4L18 2z'/%3E%3Cpath d='m14.5 5.5 4 4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 16px 16px;
+}
+
+/* Ensure text content has relative positioning for the floating button */
+.text-content {
+    position: relative;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .reader-header {
@@ -702,6 +734,17 @@ input[type="range"] {
     /* Hide margin tags on mobile for better readability */
     .margin-tag {
         display: none !important;
+    }
+    
+    /* Adjust floating comment button on mobile */
+    .floating-comment-btn {
+        right: 20px;
+        width: 32px;
+        height: 32px;
+    }
+    
+    .floating-comment-btn::before {
+        background-size: 14px 14px;
     }
     
     .chapter-navigation {

@@ -306,6 +306,9 @@ class BookReader {
             // Set up highlight listeners
             this.setupHighlightListeners();
             
+            // Setup floating comment button after content is loaded
+            this.setupFloatingCommentButton();
+            
             // Update chapter title
             document.getElementById('chapterTitle').textContent = chapter.title;
             
@@ -358,7 +361,6 @@ class BookReader {
 
     getTypeDisplayName(type) {
         switch(type) {
-            case 'reader-notes': return 'Reader Notes';
             case 'aristo-context': return 'Context from Aristo';
             case 'aristo-analysis': return 'Analysis from Aristo';
             default: return 'Unknown';
@@ -505,23 +507,16 @@ class BookReader {
             tag.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
             tag.style.fontFamily = 'Inter, sans-serif';
             
-            // Position based on highlight type
-            if (type === 'reader-notes') {
-                tag.style.left = (textRect.right + 20) + 'px';
-                tag.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
-                tag.style.color = 'white';
-                tag.style.border = '1px solid rgba(76, 175, 80, 1)';
-            } else if (type === 'aristo-context' || type === 'aristo-analysis') {
-                tag.style.right = (window.innerWidth - textRect.left + 20) + 'px';
-                if (type === 'aristo-context') {
-                    tag.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
-                    tag.style.border = '1px solid rgba(244, 67, 54, 1)';
-                } else {
-                    tag.style.backgroundColor = 'rgba(33, 150, 243, 0.9)';
-                    tag.style.border = '1px solid rgba(33, 150, 243, 1)';
-                }
-                tag.style.color = 'white';
+            // Position based on highlight type - all go on the left side now
+            tag.style.right = (window.innerWidth - textRect.left + 20) + 'px';
+            if (type === 'aristo-context') {
+                tag.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
+                tag.style.border = '1px solid rgba(244, 67, 54, 1)';
+            } else {
+                tag.style.backgroundColor = 'rgba(33, 150, 243, 0.9)';
+                tag.style.border = '1px solid rgba(33, 150, 243, 1)';
             }
+            tag.style.color = 'white';
             
             // Transform to center vertically
             tag.style.transform = 'translateY(-50%)';
@@ -610,7 +605,6 @@ class BookReader {
 
     getTypeColor(type) {
         switch(type) {
-            case 'reader-notes': return '#4CAF50';
             case 'aristo-context': return '#F44336';
             case 'aristo-analysis': return '#2196F3';
             default: return '#666';
@@ -817,6 +811,114 @@ class BookReader {
         }
         console.log('=== END DEBUG ===');
     }
+
+    setupFloatingCommentButton() {
+        console.log('Setting up floating comment button...');
+        
+        // Remove any existing floating comment button
+        const existingBtn = document.querySelector('.floating-comment-btn');
+        if (existingBtn) {
+            console.log('Removing existing button');
+            existingBtn.remove();
+        }
+        
+        // Create the floating comment button
+        const commentBtn = document.createElement('div');
+        commentBtn.className = 'floating-comment-btn';
+        commentBtn.title = 'Add a comment';
+        
+        console.log('Created button:', commentBtn);
+        
+        // Add click handler
+        commentBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Comment button clicked!');
+            this.handleCommentButtonClick();
+        });
+        
+        // Append to body for fixed positioning
+        document.body.appendChild(commentBtn);
+        console.log('Button appended to body');
+        
+        this.floatingCommentBtn = commentBtn;
+        
+        // Setup event listeners for showing/hiding the button
+        document.addEventListener('selectionchange', () => {
+            this.updateFloatingCommentButton();
+        });
+        
+        document.addEventListener('mouseup', () => {
+            setTimeout(() => this.updateFloatingCommentButton(), 10);
+        });
+        
+        const textContent = document.getElementById('textContent');
+        textContent.addEventListener('click', () => {
+            setTimeout(() => this.updateFloatingCommentButton(), 10);
+        });
+        
+        console.log('Event listeners added');
+    }
+
+    updateFloatingCommentButton() {
+        const selection = window.getSelection();
+        const textContent = document.getElementById('textContent');
+        
+        console.log('Update button called - selection exists:', !!selection);
+        console.log('Range count:', selection.rangeCount);
+        console.log('Is collapsed:', selection.isCollapsed);
+        
+        if (!selection.rangeCount || selection.isCollapsed) {
+            this.floatingCommentBtn.classList.remove('show');
+            console.log('Hiding button - no selection');
+            return;
+        }
+        
+        const range = selection.getRangeAt(0);
+        const selectedText = selection.toString().trim();
+        
+        console.log('Selected text:', selectedText, 'length:', selectedText.length);
+        
+        // Only show if there's meaningful text selected
+        if (selectedText.length < 3) {
+            this.floatingCommentBtn.classList.remove('show');
+            console.log('Hiding button - text too short');
+            return;
+        }
+        
+        // Check if selection is within text content
+        if (!textContent.contains(range.commonAncestorContainer)) {
+            this.floatingCommentBtn.classList.remove('show');
+            console.log('Hiding button - not in text content');
+            return;
+        }
+        
+        // Show the button at its fixed position
+        this.floatingCommentBtn.classList.add('show');
+        console.log('Showing button! Classes:', this.floatingCommentBtn.className);
+        
+        // Store selection info for later use
+        this.currentSelection = {
+            text: selectedText,
+            range: range.cloneRange()
+        };
+    }
+
+    handleCommentButtonClick() {
+        if (!this.currentSelection) return;
+        
+        // Hide the button
+        this.floatingCommentBtn.classList.remove('show');
+        
+        // For now, just show an alert with the selected text
+        // You can replace this with your comment implementation
+        alert(`Add comment for: "${this.currentSelection.text}"`);
+        
+        // Clear the selection
+        window.getSelection().removeAllRanges();
+        this.currentSelection = null;
+    }
+
+    // ...existing code...
 }
 
 // Initialize the app when the DOM is loaded
