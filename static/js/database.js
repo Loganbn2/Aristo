@@ -264,4 +264,78 @@ class DatabaseService {
         if (error) throw error;
         return data;
     }
+
+    // Notes
+    static async getNotes(bookId, chapterId = null) {
+        if (!isSupabaseConfigured()) {
+            return []; // Return empty array for notes in mock
+        }
+
+        let query = supabaseClient
+            .from('notes')
+            .select('*')
+            .eq('book_id', bookId);
+        
+        if (chapterId) {
+            query = query.eq('chapter_id', chapterId);
+        }
+        
+        const { data, error } = await query.order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        return data;
+    }
+
+    static async createNote(note) {
+        if (!isSupabaseConfigured()) {
+            return { 
+                ...note, 
+                id: 'mock-note-' + Date.now(), 
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+        }
+
+        const { data, error } = await supabaseClient
+            .from('notes')
+            .insert(note)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        return data;
+    }
+
+    static async updateNote(id, updates) {
+        if (!isSupabaseConfigured()) {
+            return { 
+                id, 
+                ...updates, 
+                updated_at: new Date().toISOString() 
+            };
+        }
+
+        const { data, error } = await supabaseClient
+            .from('notes')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        return data;
+    }
+
+    static async deleteNote(id) {
+        if (!isSupabaseConfigured()) {
+            return; // Do nothing in mock
+        }
+
+        const { error } = await supabaseClient
+            .from('notes')
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
+    }
 }

@@ -7,6 +7,7 @@ class BookReader {
         this.totalChapters = 0;
         this.book = null;
         this.chapterHighlights = new Map(); // Cache highlights per chapter
+        this.chapterNotes = new Map(); // Cache notes per chapter
         this.settings = {
             fontSize: 18,
             lineHeight: 1.6,
@@ -232,6 +233,23 @@ class BookReader {
             this.closeTextBubble();
         });
 
+        // Note modal event listeners
+        document.getElementById('noteModalClose').addEventListener('click', () => {
+            this.closeNoteModal();
+        });
+
+        document.getElementById('noteModalOverlay').addEventListener('click', () => {
+            this.closeNoteModal();
+        });
+
+        document.getElementById('noteCancelBtn').addEventListener('click', () => {
+            this.closeNoteModal();
+        });
+
+        document.getElementById('noteSaveBtn').addEventListener('click', () => {
+            this.saveNote();
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft' && e.ctrlKey) {
@@ -254,6 +272,7 @@ class BookReader {
             }
             this.marginTagUpdateTimeout = setTimeout(() => {
                 this.setupMarginTags();
+                this.setupNoteIndicators(); // Update note indicators on resize
             }, 100);
         });
 
@@ -263,8 +282,37 @@ class BookReader {
             }
             this.marginTagUpdateTimeout = setTimeout(() => {
                 this.setupMarginTags();
+                this.setupNoteIndicators(); // Update note indicators on scroll
             }, 50);
         });
+        
+        // Additional robust event handling
+        document.addEventListener('mouseup', (e) => {
+            console.log('Document mouseup, checking selection...');
+            setTimeout(() => {
+                const sel = window.getSelection();
+                console.log('Selection after mouseup:', sel.toString());
+                this.updateFloatingCommentButton();
+            }, 50);
+        });
+        
+        // Handle keyboard selections too
+        document.addEventListener('keyup', (e) => {
+            if (e.shiftKey || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                setTimeout(() => this.updateFloatingCommentButton(), 50);
+            }
+        });
+        
+        // Fallback: Check for selection every 500ms (for testing)
+        this.selectionCheckInterval = setInterval(() => {
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+                console.log('Interval detected selection:', selection.toString().trim());
+                this.updateFloatingCommentButton();
+            }
+        }, 500);
+        
+        console.log('Floating comment button setup complete');
     }
 
     togglePanel(panelId) {
@@ -298,6 +346,9 @@ class BookReader {
 
             // Load highlights for this chapter
             await this.loadChapterHighlights(chapter.id);
+            
+            // Load notes for this chapter
+            await this.loadChapterNotes(chapter.id);
 
             // Update content
             const contentDiv = document.getElementById('textContent');
@@ -305,6 +356,9 @@ class BookReader {
             
             // Set up highlight listeners
             this.setupHighlightListeners();
+            
+            // Setup note indicators
+            this.setupNoteIndicators();
             
             // Setup floating comment button after content is loaded
             this.setupFloatingCommentButton();
@@ -829,11 +883,30 @@ class BookReader {
         
         console.log('Created button:', commentBtn);
         
-        // Add click handler
-        commentBtn.addEventListener('click', (e) => {
+        // Add click handler with multiple approaches
+        const clickHandler = (e) => {
             e.preventDefault();
-            console.log('Comment button clicked!');
-            this.handleCommentButtonClick();
+            e.stopPropagation();
+            console.log('Button clicked!');
+            console.log('Current selection exists:', !!this.currentSelection);
+            try {
+                this.handleCommentButtonClick();
+            } catch (error) {
+                console.error('Error in comment button click handler:', error);
+            }
+        };
+        
+        commentBtn.addEventListener('click', clickHandler);
+        commentBtn.addEventListener('mousedown', clickHandler);
+        commentBtn.addEventListener('touchstart', clickHandler);
+        
+        // Also make it focusable and add keyboard support
+        commentBtn.setAttribute('tabindex', '0');
+        commentBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                clickHandler(e);
+            }
         });
         
         // Append to body for fixed positioning
@@ -842,59 +915,106 @@ class BookReader {
         
         this.floatingCommentBtn = commentBtn;
         
+        // Check if button is in DOM
+        setTimeout(() => {
+            const checkBtn = document.querySelector('.floating-comment-btn');
+            console.log('Button found after timeout:', checkBtn);
+            if (checkBtn) {
+                console.log('Button display style:', window.getComputedStyle(checkBtn).display);
+                console.log('Button visibility:', window.getComputedStyle(checkBtn).visibility);
+            }
+        }, 100);
+        
         // Setup event listeners for showing/hiding the button
         document.addEventListener('selectionchange', () => {
+            console.log('Selection change event fired');
             this.updateFloatingCommentButton();
         });
         
-        document.addEventListener('mouseup', () => {
-            setTimeout(() => this.updateFloatingCommentButton(), 10);
+        document.addEventListener('mouseup', (e) => {
+            console.log('Document mouseup, checking selection...');
+            setTimeout(() => {
+                const sel = window.getSelection();
+                console.log('Selection after mouseup:', sel.toString());
+                this.updateFloatingCommentButton();
+            }, 50);
         });
         
-        const textContent = document.getElementById('textContent');
-        textContent.addEventListener('click', () => {
-            setTimeout(() => this.updateFloatingCommentButton(), 10);
+        // Handle keyboard selections too
+        document.addEventListener('keyup', (e) => {
+            if (e.shiftKey || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                setTimeout(() => this.updateFloatingCommentButton(), 50);
+            }
         });
         
-        console.log('Event listeners added');
+        // Fallback: Check for selection every 500ms (for testing)
+        this.selectionCheckInterval = setInterval(() => {
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+                console.log('Interval detected selection:', selection.toString().trim());
+                this.updateFloatingCommentButton();
+            }
+        }, 500);
+        
+        console.log('Floating comment button setup complete');
+    }
+
+    // Clean up intervals when needed
+    cleanup() {
+        if (this.selectionCheckInterval) {
+            clearInterval(this.selectionCheckInterval);
+        }
     }
 
     updateFloatingCommentButton() {
+        if (!this.floatingCommentBtn) {
+            console.log('Button update failed - button not initialized');
+            return;
+        }
+        
         const selection = window.getSelection();
         const textContent = document.getElementById('textContent');
         
-        console.log('Update button called - selection exists:', !!selection);
-        console.log('Range count:', selection.rangeCount);
-        console.log('Is collapsed:', selection.isCollapsed);
+        if (!selection || !textContent) {
+            console.log('Button update failed - missing selection or textContent');
+            return;
+        }
+        
+        console.log('Selection update called, rangeCount:', selection.rangeCount, 'isCollapsed:', selection.isCollapsed);
         
         if (!selection.rangeCount || selection.isCollapsed) {
             this.floatingCommentBtn.classList.remove('show');
-            console.log('Hiding button - no selection');
+            console.log('Button hidden - no selection or collapsed');
             return;
         }
         
         const range = selection.getRangeAt(0);
         const selectedText = selection.toString().trim();
         
-        console.log('Selected text:', selectedText, 'length:', selectedText.length);
+        console.log('Selected text:', `"${selectedText}"`, 'length:', selectedText.length);
         
-        // Only show if there's meaningful text selected
-        if (selectedText.length < 3) {
+        // Only show if there's meaningful text selected (reduced threshold)
+        if (selectedText.length < 1) {
             this.floatingCommentBtn.classList.remove('show');
-            console.log('Hiding button - text too short');
+            console.log('Button hidden - no text selected');
             return;
         }
         
-        // Check if selection is within text content
-        if (!textContent.contains(range.commonAncestorContainer)) {
+        // Check if selection is within text content area
+        const ancestor = range.commonAncestorContainer;
+        const isInTextArea = textContent.contains(ancestor) || textContent === ancestor;
+        console.log('Selection in text area:', isInTextArea, 'ancestor:', ancestor.nodeName);
+        
+        if (!isInTextArea) {
             this.floatingCommentBtn.classList.remove('show');
-            console.log('Hiding button - not in text content');
+            console.log('Button hidden - not in text content');
             return;
         }
         
         // Show the button at its fixed position
         this.floatingCommentBtn.classList.add('show');
-        console.log('Showing button! Classes:', this.floatingCommentBtn.className);
+        console.log('Button showing! Classes:', this.floatingCommentBtn.className);
+        console.log('Button computed display:', window.getComputedStyle(this.floatingCommentBtn).display);
         
         // Store selection info for later use
         this.currentSelection = {
@@ -903,25 +1023,594 @@ class BookReader {
         };
     }
 
-    handleCommentButtonClick() {
-        if (!this.currentSelection) return;
-        
-        // Hide the button
-        this.floatingCommentBtn.classList.remove('show');
-        
-        // For now, just show an alert with the selected text
-        // You can replace this with your comment implementation
-        alert(`Add comment for: "${this.currentSelection.text}"`);
-        
-        // Clear the selection
-        window.getSelection().removeAllRanges();
-        this.currentSelection = null;
+    // Test function to force show the button (for debugging)
+    testShowButton() {
+        console.log('TEST: Forcing button to show');
+        this.floatingCommentBtn.classList.add('show');
+        console.log('TEST: Button classes after force show:', this.floatingCommentBtn.className);
+        console.log('TEST: Button computed display:', window.getComputedStyle(this.floatingCommentBtn).display);
     }
 
-    // ...existing code...
+    handleCommentButtonClick() {
+        console.log('handleCommentButtonClick called');
+        console.log('currentSelection:', this.currentSelection);
+        
+        if (!this.currentSelection) {
+            console.log('No current selection, cannot open note modal');
+            return;
+        }
+        
+        try {
+            // Hide the button
+            this.floatingCommentBtn.classList.remove('show');
+            console.log('Button hidden');
+            
+            // Open the note modal
+            console.log('Opening note modal with text:', this.currentSelection.text);
+            this.openNoteModal(this.currentSelection.text);
+            
+            // Clear the selection
+            window.getSelection().removeAllRanges();
+            console.log('Selection cleared');
+            
+        } catch (error) {
+            console.error('Error in handleCommentButtonClick:', error);
+        }
+    }
+
+    // Note functionality
+    openNoteModal(selectedText) {
+        console.log('openNoteModal called with text:', selectedText);
+        
+        const modal = document.getElementById('noteModal');
+        const overlay = document.getElementById('noteModalOverlay');
+        const selectedTextDisplay = document.getElementById('noteSelectedText');
+        const textarea = document.getElementById('noteTextarea');
+        
+        console.log('Modal elements found:', {
+            modal: !!modal,
+            overlay: !!overlay,
+            selectedTextDisplay: !!selectedTextDisplay,
+            textarea: !!textarea
+        });
+        
+        if (!modal || !overlay || !selectedTextDisplay || !textarea) {
+            console.error('Note modal elements not found!');
+            return;
+        }
+        
+        try {
+            // Display the selected text
+            selectedTextDisplay.textContent = selectedText;
+            console.log('Selected text set in modal');
+            
+            // Clear the textarea
+            textarea.value = '';
+            console.log('Textarea cleared');
+            
+            // Show the modal
+            overlay.classList.add('show');
+            modal.classList.add('show');
+            console.log('Modal classes added, should be visible now');
+            
+            // Focus on the textarea
+            setTimeout(() => {
+                textarea.focus();
+                console.log('Textarea focused');
+            }, 100);
+            
+            // Prevent body scrolling
+            document.body.style.overflow = 'hidden';
+            console.log('Body scrolling disabled');
+            
+        } catch (error) {
+            console.error('Error in openNoteModal:', error);
+        }
+    }
+    
+    closeNoteModal() {
+        const modal = document.getElementById('noteModal');
+        const overlay = document.getElementById('noteModalOverlay');
+        
+        overlay.classList.remove('show');
+        modal.classList.remove('show');
+        
+        // Re-enable body scrolling
+        document.body.style.overflow = 'auto';
+        
+        // Clear selection
+        this.currentSelection = null;
+    }
+    
+    async saveNote() {
+        if (!this.currentSelection) {
+            console.log('No current selection for note');
+            return;
+        }
+        
+        const textarea = document.getElementById('noteTextarea');
+        const noteContent = textarea.value.trim();
+        
+        if (!noteContent) {
+            alert('Please enter a note before saving.');
+            return;
+        }
+        
+        try {
+            // Disable the save button while saving
+            const saveBtn = document.getElementById('noteSaveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            
+            console.log('Preparing to save note:', {
+                book_id: this.currentBookId,
+                chapter_id: this.currentChapterId,
+                selected_text: this.currentSelection.text,
+                note_content: noteContent
+            });
+            
+            // Create the note object
+            const note = {
+                book_id: this.currentBookId,
+                chapter_id: this.currentChapterId,
+                selected_text: this.currentSelection.text,
+                note_content: noteContent,
+                note_position: {
+                    // Store position data for future use
+                    startOffset: this.currentSelection.range.startOffset,
+                    endOffset: this.currentSelection.range.endOffset,
+                    startContainerPath: this.getNodePath(this.currentSelection.range.startContainer),
+                    endContainerPath: this.getNodePath(this.currentSelection.range.endContainer)
+                }
+            };
+            
+            console.log('Calling DatabaseService.createNote with:', note);
+            
+            // Save to database
+            const savedNote = await DatabaseService.createNote(note);
+            console.log('Note saved successfully:', savedNote);
+            
+            // Update local cache
+            if (!this.chapterNotes.has(this.currentChapterId)) {
+                this.chapterNotes.set(this.currentChapterId, new Map());
+            }
+            const notesMap = this.chapterNotes.get(this.currentChapterId);
+            notesMap.set(savedNote.id, savedNote);
+            
+            // Close the modal
+            this.closeNoteModal();
+            
+            // Refresh note indicators
+            this.setupNoteIndicators();
+            
+            // Show success message
+            this.showToast('Note saved successfully!');
+            
+        } catch (error) {
+            console.error('Detailed error saving note:', error);
+            console.error('Error stack:', error.stack);
+            console.error('Error message:', error.message);
+            
+            // Show more specific error message
+            let errorMessage = 'Failed to save note. ';
+            if (error.message) {
+                if (error.message.includes('relation "notes" does not exist')) {
+                    errorMessage += 'The notes table has not been created in your database. Please run the notes_table_schema.sql file in your Supabase SQL editor.';
+                } else if (error.message.includes('permission denied')) {
+                    errorMessage += 'Permission denied. Please check your Supabase Row Level Security settings.';
+                } else if (error.message.includes('network')) {
+                    errorMessage += 'Network error. Please check your internet connection and try again.';
+                } else {
+                    errorMessage += `Error: ${error.message}`;
+                }
+            } else {
+                errorMessage += 'Please try again or check the console for more details.';
+            }
+            
+            alert(errorMessage);
+        } finally {
+            // Re-enable the save button
+            const saveBtn = document.getElementById('noteSaveBtn');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Note';
+            }
+        }
+    }
+    
+    async loadChapterNotes(chapterId) {
+        try {
+            console.log('Loading notes for chapter:', chapterId);
+            const notes = await DatabaseService.getNotes(this.currentBookId, chapterId);
+            console.log('Raw notes from database:', notes);
+            
+            // Store notes in cache
+            this.chapterNotes.set(chapterId, new Map());
+            const notesMap = this.chapterNotes.get(chapterId);
+            
+            notes.forEach(note => {
+                console.log('Adding note to cache:', note.id, note);
+                notesMap.set(note.id, note);
+            });
+            
+            console.log('Chapter notes loaded into cache:', notesMap);
+            console.log('Cache size:', notesMap.size);
+        } catch (error) {
+            console.error('Error loading chapter notes:', error);
+        }
+    }
+    
+    setupNoteIndicators() {
+        console.log('=== SETTING UP NOTE INDICATORS ===');
+        console.log('Current chapter ID:', this.currentChapterId);
+        
+        // Remove existing note indicators
+        document.querySelectorAll('.note-indicator').forEach(indicator => indicator.remove());
+        
+        const notes = this.chapterNotes.get(this.currentChapterId);
+        console.log('Notes for current chapter:', notes);
+        
+        if (!notes || notes.size === 0) {
+            console.log('No notes found for this chapter');
+            return;
+        }
+        
+        const textContent = document.getElementById('textContent');
+        if (!textContent) return;
+        
+        // Sort notes to prevent overlapping indicators
+        const notesArray = Array.from(notes.values()).sort((a, b) => {
+            const posA = this.findTextPosition(a.selected_text);
+            const posB = this.findTextPosition(b.selected_text);
+            if (!posA || !posB) return 0;
+            return posA.top - posB.top;
+        });
+        
+        console.log('Notes array to process:', notesArray);
+        
+        let lastIndicatorTop = -50; // Track last indicator position to prevent overlap
+        
+        notesArray.forEach((note, index) => {
+            console.log(`Processing note ${index}:`, note);
+            const position = this.findTextPosition(note.selected_text);
+            console.log('Found position for note:', position);
+            
+            let indicatorTop;
+            if (position) {
+                indicatorTop = position.top + window.scrollY;
+                console.log('Calculated indicatorTop from position:', indicatorTop);
+                
+                // Prevent overlapping indicators
+                if (indicatorTop - lastIndicatorTop < 30) {
+                    indicatorTop = lastIndicatorTop + 30;
+                    console.log('Adjusted indicatorTop to prevent overlap:', indicatorTop);
+                }
+            } else {
+                // Fallback: position based on order if text not found
+                const textRect = textContent.getBoundingClientRect();
+                indicatorTop = textRect.top + window.scrollY + (index * 40) + 50;
+                console.log('Using fallback position:', indicatorTop);
+            }
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'note-indicator right';
+            indicator.title = `Note: ${note.note_content.substring(0, 50)}...`;
+            indicator.style.position = 'fixed'; // Use fixed positioning for testing
+            indicator.style.top = (200 + index * 40) + 'px'; // Move down from top
+            indicator.style.right = '200px'; // Move closer to middle from right edge
+            indicator.style.width = '24px';
+            indicator.style.height = '24px';
+            indicator.style.backgroundColor = '#4CAF50'; // Green color
+            indicator.style.borderRadius = '50%';
+            indicator.style.zIndex = '1000';
+            indicator.style.cursor = 'pointer';
+            indicator.style.border = '2px solid white';
+            indicator.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+            indicator.style.display = 'flex';
+            indicator.style.alignItems = 'center';
+            indicator.style.justifyContent = 'center';
+            indicator.style.fontSize = '18px';
+            indicator.style.lineHeight = '1';
+            indicator.style.color = 'white';
+            indicator.style.fontWeight = 'bold';
+            // Use SVG quote icon instead of text character
+            indicator.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/>
+                </svg>
+            `;
+            
+            console.log(`Created indicator at top: ${200 + index * 40}px, right: 200px`);
+            
+            // Add click handler to show note
+            indicator.addEventListener('click', () => {
+                this.showNoteDetails(note);
+            });
+            
+            document.body.appendChild(indicator);
+            lastIndicatorTop = indicatorTop;
+            
+            console.log('Indicator appended to body');
+        });
+        
+        console.log('=== END NOTE INDICATORS SETUP ===');
+    }
+    
+    findTextPosition(selectedText) {
+        console.log('Finding position for text:', selectedText.substring(0, 50) + '...');
+        
+        // Find the position of the selected text in the content
+        const textContent = document.getElementById('textContent');
+        if (!textContent) {
+            console.log('No textContent element found');
+            return null;
+        }
+        
+        // Create a temporary range to find the text
+        const walker = document.createTreeWalker(
+            textContent,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+        
+        let node;
+        while (node = walker.nextNode()) {
+            const text = node.textContent;
+            const index = text.indexOf(selectedText);
+            
+            if (index !== -1) {
+                console.log('Found exact text match in node:', node);
+                // Found the text, create a range to get its position
+                const range = document.createRange();
+                range.setStart(node, index);
+                range.setEnd(node, index + selectedText.length);
+                
+                const rect = range.getBoundingClientRect();
+                console.log('Text rect:', rect);
+                if (rect.height > 0) { // Make sure it's visible
+                    const position = {
+                        top: rect.top + (rect.height / 2), // Center of the text
+                        left: rect.left,
+                        right: rect.right
+                    };
+                    console.log('Returning position:', position);
+                    return position;
+                }
+            }
+        }
+        
+        console.log('Exact text not found, trying first few words...');
+        // If exact match not found, try a fuzzy search for the first few words
+        const firstWords = selectedText.split(' ').slice(0, 3).join(' ');
+        if (firstWords !== selectedText && firstWords.length > 0) {
+            console.log('Searching for first words:', firstWords);
+            return this.findTextPosition(firstWords);
+        }
+        
+        console.log('Text position not found');
+        return null;
+    }
+    
+    showNoteDetails(note) {
+        // Use the existing text bubble to show note details
+        const bubble = document.getElementById('textBubble');
+        const overlay = document.getElementById('textBubbleOverlay');
+        const title = document.getElementById('textBubbleTitle');
+        const type = document.getElementById('textBubbleType');
+        const content = document.getElementById('textBubbleContent');
+
+        title.textContent = 'Your Note';
+        type.textContent = 'Reader Note';
+        type.className = 'text-bubble-type note-type';
+        
+        const noteDate = new Date(note.created_at).toLocaleDateString();
+        content.innerHTML = `
+            <div style="margin-bottom: 1rem; padding: 1rem; background: var(--hover-color); border-radius: 0.5rem;">
+                <strong>Selected Text:</strong><br>
+                <em>"${note.selected_text}"</em>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <strong>Your Note:</strong><br>
+                ${note.note_content.replace(/\n/g, '<br>')}
+            </div>
+            <div style="font-size: 0.875rem; opacity: 0.7;">
+                Created: ${noteDate}
+            </div>
+        `;
+
+        overlay.classList.add('show');
+        bubble.classList.add('show');
+
+        // Prevent body scrolling when bubble is open
+        document.body.style.overflow = 'hidden';
+    }
+    
+    showToast(message) {
+        // Simple toast notification
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--accent-color);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            z-index: 3000;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(0)';
+        }, 10);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+    
+    getNodePath(node) {
+        // Helper function to get a path to a DOM node
+        // This is a simplified version - you might want a more robust implementation
+        const path = [];
+        let current = node;
+        
+        while (current && current !== document.getElementById('textContent')) {
+            if (current.nodeType === Node.ELEMENT_NODE) {
+                const siblings = Array.from(current.parentNode.children);
+                const index = siblings.indexOf(current);
+                path.unshift(`${current.tagName.toLowerCase()}[${index}]`);
+            } else if (current.nodeType === Node.TEXT_NODE) {
+                const siblings = Array.from(current.parentNode.childNodes);
+                const index = siblings.indexOf(current);
+                path.unshift(`text()[${index}]`);
+            }
+            current = current.parentNode;
+        }
+        
+        return path.join('/');
+    }
+
+    // Test database connection and notes table
+    async testDatabase() {
+        console.log('=== DATABASE CONNECTION TEST ===');
+        
+        try {
+            // Test basic Supabase connection
+            console.log('1. Testing Supabase connection...');
+            const books = await DatabaseService.getBooks();
+            console.log('   Books loaded:', books.length, 'books found');
+            
+            // Test notes table access
+            console.log('2. Testing notes table access...');
+            const testNote = {
+                book_id: this.currentBookId,
+                chapter_id: this.currentChapterId,
+                selected_text: 'Test selection for database test',
+                note_content: 'This is a test note to check database connectivity',
+                note_position: { test: true }
+            };
+            
+            const savedNote = await DatabaseService.createNote(testNote);
+            console.log('   Test note created successfully:', savedNote);
+            
+            // Clean up test note if we have a delete method
+            if (DatabaseService.deleteNote) {
+                await DatabaseService.deleteNote(savedNote.id);
+                console.log('   Test note cleaned up');
+            }
+            
+            console.log('✅ Database connection successful!');
+            
+        } catch (error) {
+            console.error('❌ Database test failed:', error);
+            console.error('Error details:', error.message);
+            
+            if (error.message.includes('relation "notes" does not exist')) {
+                console.log('💡 Solution: Run the notes_table_schema.sql file in your Supabase SQL editor');
+            } else if (error.message.includes('permission denied')) {
+                console.log('💡 Solution: Check your Supabase Row Level Security settings');
+            }
+        }
+        
+        console.log('=== END DATABASE TEST ===');
+    }
+
+    // Comprehensive test function
+    testCommentSystem() {
+        console.log('=== COMMENT SYSTEM TEST ===');
+        
+        // Test 1: Check if button exists
+        console.log('1. Button exists:', !!this.floatingCommentBtn);
+        
+        // Test 2: Check button properties
+        if (this.floatingCommentBtn) {
+            console.log('2. Button classes:', this.floatingCommentBtn.className);
+            console.log('   Button display:', window.getComputedStyle(this.floatingCommentBtn).display);
+            console.log('   Button pointer-events:', window.getComputedStyle(this.floatingCommentBtn).pointerEvents);
+            console.log('   Button z-index:', window.getComputedStyle(this.floatingCommentBtn).zIndex);
+        }
+        
+        // Test 3: Set up a fake selection
+        this.currentSelection = {
+            text: 'Test selection for debugging',
+            range: { cloneRange: () => ({ startOffset: 0, endOffset: 10 }) }
+        };
+        console.log('3. Set fake selection:', this.currentSelection);
+        
+        // Test 4: Try to show button
+        if (this.floatingCommentBtn) {
+            this.floatingCommentBtn.classList.add('show');
+            console.log('4. Forced button to show');
+        }
+        
+        // Test 5: Test modal elements
+        const modal = document.getElementById('noteModal');
+        const overlay = document.getElementById('noteModalOverlay');
+        console.log('5. Modal elements exist:', {
+            modal: !!modal,
+            overlay: !!overlay,
+            selectedText: !!document.getElementById('noteSelectedText'),
+            textarea: !!document.getElementById('noteTextarea')
+        });
+        
+        // Test 6: Try opening modal directly
+        try {
+            this.openNoteModal('Test text for modal');
+            console.log('6. Modal opened successfully');
+        } catch (error) {
+            console.error('6. Error opening modal:', error);
+        }
+        
+        console.log('=== END TEST ===');
+        console.log('To test button click: Try clicking the button now, or run window.bookReader.handleCommentButtonClick()');
+   }
+
+    // Manual test function to check notes
+    async testNoteDisplay() {
+        console.log('=== MANUAL NOTE TEST ===');
+        console.log('Current book ID:', this.currentBookId);
+        console.log('Current chapter ID:', this.currentChapterId);
+        
+        // Force reload notes
+        await this.loadChapterNotes(this.currentChapterId);
+        
+        // Force setup indicators
+        this.setupNoteIndicators();
+        
+        // Check if any indicators were created
+        const indicators = document.querySelectorAll('.note-indicator');
+        console.log('Number of indicators found:', indicators.length);
+        
+        indicators.forEach((indicator, index) => {
+            console.log(`Indicator ${index}:`, {
+                top: indicator.style.top,
+                right: indicator.style.right,
+                classes: indicator.className,
+                visible: window.getComputedStyle(indicator).display !== 'none'
+            });
+        });
+        
+        console.log('=== END NOTE TEST ===');
+    }
 }
 
 // Initialize the app when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new BookReader();
+    window.bookReader = new BookReader();
+    console.log('BookReader initialized and available as window.bookReader');
 });

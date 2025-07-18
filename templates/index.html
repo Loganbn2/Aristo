@@ -135,6 +135,31 @@
                 <!-- Dynamic content will be loaded here -->
             </div>
         </div>
+
+        <!-- Note Modal Overlay -->
+        <div id="noteModalOverlay" class="note-modal-overlay"></div>
+        
+        <!-- Note Modal -->
+        <div id="noteModal" class="note-modal">
+            <div class="note-modal-header">
+                <h2 class="note-modal-title">Add a Note</h2>
+                <button id="noteModalClose" class="note-modal-close">×</button>
+            </div>
+            <div class="note-modal-content">
+                <div class="note-selected-text">
+                    <label class="note-label">Selected Text:</label>
+                    <div id="noteSelectedText" class="note-text-display"></div>
+                </div>
+                <div class="note-input-section">
+                    <label for="noteTextarea" class="note-label">Your Note:</label>
+                    <textarea id="noteTextarea" class="note-textarea" placeholder="Write your note here..."></textarea>
+                </div>
+                <div class="note-modal-actions">
+                    <button id="noteCancelBtn" class="note-btn note-btn-cancel">Cancel</button>
+                    <button id="noteSaveBtn" class="note-btn note-btn-save">Save Note</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Supabase Client -->
