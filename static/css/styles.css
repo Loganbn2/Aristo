@@ -192,7 +192,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 0 1rem;
+    padding: 0 150px; /* Increased padding for margin tags */
     min-height: calc(100vh - 200px); /* Account for header and navigation */
 }
 
@@ -206,12 +206,14 @@ body {
     padding: 2rem 3rem;
     margin: 0 auto;
     transition: all 0.3s ease;
+    position: relative;
 }
 
 .text-content p {
     margin-bottom: 1.5rem;
     text-align: justify;
     hyphens: auto;
+    position: relative;
 }
 
 .text-content p:last-child {
@@ -688,9 +690,18 @@ input[type="range"] {
         padding: 1rem;
     }
     
+    .reading-container {
+        padding: 0 1rem; /* Reduce padding on mobile */
+    }
+    
     .text-content {
         padding: 1.5rem 2rem;
         font-size: 16px;
+    }
+    
+    /* Hide margin tags on mobile for better readability */
+    .margin-tag {
+        display: none !important;
     }
     
     .chapter-navigation {
@@ -740,6 +751,10 @@ input[type="range"] {
 }
 
 @media (max-width: 480px) {
+    .reading-container {
+        padding: 0 0.5rem; /* Even less padding on very small screens */
+    }
+    
     .text-content {
         padding: 1rem;
         margin: 0;

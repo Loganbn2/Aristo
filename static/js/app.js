@@ -246,6 +246,25 @@ class BookReader {
                 this.closeTextBubble();
             }
         });
+
+        // Update margin tags on window resize and scroll
+        window.addEventListener('resize', () => {
+            if (this.marginTagUpdateTimeout) {
+                clearTimeout(this.marginTagUpdateTimeout);
+            }
+            this.marginTagUpdateTimeout = setTimeout(() => {
+                this.setupMarginTags();
+            }, 100);
+        });
+
+        window.addEventListener('scroll', () => {
+            if (this.marginTagUpdateTimeout) {
+                clearTimeout(this.marginTagUpdateTimeout);
+            }
+            this.marginTagUpdateTimeout = setTimeout(() => {
+                this.setupMarginTags();
+            }, 50);
+        });
     }
 
     togglePanel(panelId) {
@@ -409,15 +428,17 @@ class BookReader {
             
             if (highlightData.length === 1) {
                 // Single highlight
-                const { term, type } = highlightData[0];
-                const replacement = `<span class="highlight ${type}" data-highlight="${term}" data-type="${type}">${text}</span>`;
+                const { term, type, data } = highlightData[0];
+                const title = data.title || 'Highlight';
+                const replacement = `<span class="highlight ${type}" data-highlight="${term}" data-type="${type}" data-title="${title}">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
                 console.log('Applied single highlight:', text, 'with type:', type);
             } else {
                 // Multiple overlapping highlights
                 const typeClasses = highlightData.map(h => h.type).join(' ');
                 const terms = highlightData.map(h => h.term).join('|');
-                const replacement = `<span class="highlight highlight-stack ${typeClasses}" data-highlight="${terms}" data-type="multiple">${text}</span>`;
+                const titles = highlightData.map(h => h.data.title || 'Highlight').join(' | ');
+                const replacement = `<span class="highlight highlight-stack ${typeClasses}" data-highlight="${terms}" data-type="multiple" data-title="${titles}">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
                 console.log('Applied multiple highlights:', text, 'with types:', typeClasses);
             }
@@ -441,6 +462,78 @@ class BookReader {
                     // Single highlight
                     this.showTextBubble(highlightData);
                 }
+            });
+        });
+        
+        // Set up margin tags
+        this.setupMarginTags();
+    }
+
+    setupMarginTags() {
+        // Remove any existing margin tags
+        document.querySelectorAll('.margin-tag').forEach(tag => tag.remove());
+        
+        const textContent = document.getElementById('textContent');
+        const textRect = textContent.getBoundingClientRect();
+        
+        document.querySelectorAll('.highlight').forEach(highlight => {
+            const title = highlight.dataset.title;
+            const type = highlight.dataset.type;
+            
+            if (!title || type === 'multiple') return;
+            
+            // Create margin tag element
+            const tag = document.createElement('div');
+            tag.className = `margin-tag margin-tag-${type}`;
+            tag.textContent = title;
+            
+            // Position the tag
+            const highlightRect = highlight.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+            tag.style.position = 'absolute';
+            tag.style.top = (highlightRect.top + scrollTop + highlightRect.height / 2) + 'px';
+            tag.style.zIndex = '10';
+            tag.style.pointerEvents = 'none';
+            tag.style.fontSize = '0.75rem';
+            tag.style.fontWeight = '500';
+            tag.style.padding = '0.25rem 0.5rem';
+            tag.style.borderRadius = '0.25rem';
+            tag.style.whiteSpace = 'nowrap';
+            tag.style.opacity = '0.8';
+            tag.style.transition = 'opacity 0.2s ease';
+            tag.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+            tag.style.fontFamily = 'Inter, sans-serif';
+            
+            // Position based on highlight type
+            if (type === 'reader-notes') {
+                tag.style.left = (textRect.right + 20) + 'px';
+                tag.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
+                tag.style.color = 'white';
+                tag.style.border = '1px solid rgba(76, 175, 80, 1)';
+            } else if (type === 'aristo-context' || type === 'aristo-analysis') {
+                tag.style.right = (window.innerWidth - textRect.left + 20) + 'px';
+                if (type === 'aristo-context') {
+                    tag.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
+                    tag.style.border = '1px solid rgba(244, 67, 54, 1)';
+                } else {
+                    tag.style.backgroundColor = 'rgba(33, 150, 243, 0.9)';
+                    tag.style.border = '1px solid rgba(33, 150, 243, 1)';
+                }
+                tag.style.color = 'white';
+            }
+            
+            // Transform to center vertically
+            tag.style.transform = 'translateY(-50%)';
+            
+            document.body.appendChild(tag);
+            
+            // Add hover effects
+            highlight.addEventListener('mouseenter', () => {
+                tag.style.opacity = '1';
+            });
+            highlight.addEventListener('mouseleave', () => {
+                tag.style.opacity = '0.8';
             });
         });
     }
