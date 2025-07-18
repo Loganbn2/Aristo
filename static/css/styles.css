@@ -307,8 +307,10 @@ body {
 .text-bubble {
     position: fixed;
     top: 5%;
-    left: 5%;
-    width: 90vw;
+    left: 50%;
+    transform: translateX(-50%) scale(0.95);
+    max-width: 700px;
+    width: calc(100% - 4rem);
     height: 90vh;
     background-color: var(--bg-color);
     border: 2px solid var(--border-color);
@@ -318,7 +320,6 @@ body {
     padding: 2rem;
     opacity: 0;
     visibility: hidden;
-    transform: scale(0.95);
     transition: all 0.3s ease;
     overflow-y: auto;
     backdrop-filter: blur(20px);
@@ -327,7 +328,7 @@ body {
 .text-bubble.show {
     opacity: 1;
     visibility: visible;
-    transform: scale(1);
+    transform: translateX(-50%) scale(1);
 }
 
 .text-bubble-header {
@@ -721,10 +722,16 @@ input[type="range"] {
     
     .text-bubble {
         top: 2%;
-        left: 2%;
-        width: 96vw;
+        left: 50%;
+        transform: translateX(-50%) scale(0.95);
+        width: calc(100% - 3rem);
+        max-width: none;
         height: 96vh;
         padding: 1.5rem;
+    }
+    
+    .text-bubble.show {
+        transform: translateX(-50%) scale(1);
     }
     
     .text-bubble-title {
@@ -748,10 +755,16 @@ input[type="range"] {
     
     .text-bubble {
         top: 1%;
-        left: 1%;
-        width: 98vw;
+        left: 50%;
+        transform: translateX(-50%) scale(0.95);
+        width: calc(100% - 2rem);
+        max-width: none;
         height: 98vh;
         padding: 1rem;
+    }
+    
+    .text-bubble.show {
+        transform: translateX(-50%) scale(1);
     }
     
     .text-bubble-content {
