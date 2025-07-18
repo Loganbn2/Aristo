@@ -32,6 +32,9 @@ class BookReader {
             await this.loadBook(bookToLoad);
             await this.loadChapter(this.currentChapterNumber);
             this.updateProgress();
+            
+            // Debug highlight data
+            await this.debugHighlightData();
         }
     }
 
@@ -79,12 +82,16 @@ class BookReader {
                 bookId = books[0].id; // Use the first book
             }
 
+            console.log('Loading book with ID:', bookId);
             this.book = await DatabaseService.getBook(bookId);
             this.currentBookId = bookId;
             this.totalChapters = this.book.chapters.length;
             
             // Sort chapters by chapter_number
             this.book.chapters.sort((a, b) => a.chapter_number - b.chapter_number);
+            
+            console.log('Loaded book:', this.book);
+            console.log('Available chapters:', this.book.chapters.map(c => ({ id: c.id, number: c.chapter_number, title: c.title })));
             
             // Load reading progress
             await this.loadReadingProgress();
@@ -266,6 +273,7 @@ class BookReader {
                 return;
             }
 
+            console.log('Loading chapter:', chapterNumber, 'with ID:', chapter.id);
             this.currentChapterId = chapter.id;
             this.currentChapterNumber = chapterNumber;
 
@@ -305,12 +313,14 @@ class BookReader {
     async loadChapterHighlights(chapterId) {
         try {
             const highlights = await DatabaseService.getHighlights(this.currentBookId, chapterId);
+            console.log('Loading highlights for chapter:', chapterId, highlights);
             
             // Convert highlights array to a map for easy lookup
             this.chapterHighlights.set(chapterId, new Map());
             const highlightMap = this.chapterHighlights.get(chapterId);
             
             highlights.forEach(highlight => {
+                console.log('Processing highlight:', highlight);
                 highlightMap.set(highlight.selected_text.toLowerCase(), {
                     id: highlight.id,
                     type: highlight.highlight_type,
@@ -320,6 +330,8 @@ class BookReader {
                     selectedText: highlight.selected_text
                 });
             });
+            
+            console.log('Chapter highlights loaded:', highlightMap);
         } catch (error) {
             console.error('Error loading chapter highlights:', error);
         }
@@ -343,7 +355,9 @@ class BookReader {
         
         // Get highlights for current chapter
         const highlights = this.chapterHighlights.get(this.currentChapterId);
+        console.log('Formatting content with highlights:', highlights);
         if (!highlights || highlights.size === 0) {
+            console.log('No highlights found for chapter:', this.currentChapterId);
             return formattedContent;
         }
 
@@ -352,10 +366,16 @@ class BookReader {
         
         // First pass: identify all highlight positions
         highlights.forEach((highlight, term) => {
-            const regex = new RegExp(`\\b${highlight.selectedText}\\b`, 'gi');
+            // Escape special regex characters in the selected text
+            const escapedText = highlight.selectedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Use a more flexible regex that doesn't require word boundaries
+            const regex = new RegExp(escapedText, 'gi');
             let match;
             
+            console.log('Searching for highlight:', highlight.selectedText, 'with regex:', regex);
+            
             while ((match = regex.exec(formattedContent)) !== null) {
+                console.log('Found match:', match[0], 'at position:', match.index);
                 const start = match.index;
                 const end = start + match[0].length;
                 const key = `${start}-${end}`;
@@ -381,6 +401,8 @@ class BookReader {
         const sortedHighlights = Array.from(highlightMap.values())
             .sort((a, b) => b.start - a.start);
         
+        console.log('Found highlights to apply:', sortedHighlights);
+        
         // Apply highlights from end to beginning to maintain positions
         sortedHighlights.forEach(highlight => {
             const { start, end, text, highlights: highlightData } = highlight;
@@ -390,12 +412,14 @@ class BookReader {
                 const { term, type } = highlightData[0];
                 const replacement = `<span class="highlight ${type}" data-highlight="${term}" data-type="${type}">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
+                console.log('Applied single highlight:', text, 'with type:', type);
             } else {
                 // Multiple overlapping highlights
                 const typeClasses = highlightData.map(h => h.type).join(' ');
                 const terms = highlightData.map(h => h.term).join('|');
                 const replacement = `<span class="highlight highlight-stack ${typeClasses}" data-highlight="${terms}" data-type="multiple">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
+                console.log('Applied multiple highlights:', text, 'with types:', typeClasses);
             }
         });
         
@@ -667,6 +691,38 @@ class BookReader {
         } catch (error) {
             console.error('Error switching book:', error);
         }
+    }
+
+    // Temporary debugging function
+    async debugHighlightData() {
+        console.log('=== DEBUG HIGHLIGHT DATA ===');
+        console.log('Current book ID:', this.currentBookId);
+        console.log('Current chapter ID:', this.currentChapterId);
+        console.log('Current chapter number:', this.currentChapterNumber);
+        
+        // Get all highlights for current book
+        try {
+            const allHighlights = await DatabaseService.getHighlights(this.currentBookId);
+            console.log('All highlights for current book:', allHighlights);
+            
+            // Get highlights for current chapter
+            const chapterHighlights = await DatabaseService.getHighlights(this.currentBookId, this.currentChapterId);
+            console.log('Highlights for current chapter:', chapterHighlights);
+            
+            // Check the specific highlight from your CSV
+            const csvHighlight = {
+                book_id: '2b154c7a-5485-483e-982e-8425ec7d67d6',
+                chapter_id: '938f5fce-4637-4e2e-a1cc-6f484549132b',
+                selected_text: 'An account of Lehi and his wife Sariah, and his four sons, being called, (beginning at the eldest) Laman, Lemuel, Sam, and Nephi.'
+            };
+            
+            console.log('CSV highlight book ID matches current:', csvHighlight.book_id === this.currentBookId);
+            console.log('CSV highlight chapter ID matches current:', csvHighlight.chapter_id === this.currentChapterId);
+            
+        } catch (error) {
+            console.error('Error in highlight debugging:', error);
+        }
+        console.log('=== END DEBUG ===');
     }
 }
 
