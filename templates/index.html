@@ -120,6 +120,11 @@
             </div>
         </div>
 
+        <!-- Floating Aristo Button -->
+        <button id="aristoFloatingBtn" class="aristo-floating-btn" title="Aristo AI Assistant" aria-label="Open Aristo AI Assistant">
+            A
+        </button>
+
         <!-- Text Bubble Overlay -->
         <div id="textBubbleOverlay" class="text-bubble-overlay"></div>
         
@@ -206,10 +211,35 @@
                 </div>
             </div>
         </div>
+
+        <!-- Aristo AI Modal Overlay -->
+        <div id="aristoModalOverlay" class="aristo-modal-overlay"></div>
+        
+        <!-- Aristo AI Modal -->
+        <div id="aristoModal" class="aristo-modal">
+            <div class="aristo-modal-header">
+                <h2 class="aristo-modal-title">🤖 Ask Aristo AI</h2>
+                <button id="aristoModalClose" class="aristo-modal-close">×</button>
+            </div>
+            <div class="aristo-modal-content">
+                <div class="aristo-input-section">
+                    <label for="aristoTextarea" class="aristo-label">What would you like to know about this text?</label>
+                    <textarea id="aristoTextarea" class="aristo-textarea" placeholder="Ask me anything about the text you're reading, request explanations, analysis, or context..."></textarea>
+                </div>
+                <div id="aristoResponse" class="aristo-response" style="display: none;">
+                    <label class="aristo-label">Aristo's Response:</label>
+                    <div id="aristoResponseContent" class="aristo-response-content"></div>
+                </div>
+                <div class="aristo-modal-actions">
+                    <button id="aristoCancelBtn" class="aristo-btn aristo-btn-cancel">Cancel</button>
+                    <button id="aristoSubmitBtn" class="aristo-btn aristo-btn-submit">Ask Aristo</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Supabase Client -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
     <!-- Database Service -->
     <script src="{{ url_for('static', filename='js/database.js') }}"></script>
     <!-- Main Application -->

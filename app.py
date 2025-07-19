@@ -2,9 +2,20 @@ from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import os
 import json
+import openai
+from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+
+# Initialize OpenAI client using environment variables
+openai_client = OpenAI(
+    api_key=os.getenv('OPENAI_API_KEY')
+)
 
 # Sample book content
 SAMPLE_BOOK = {
@@ -59,5 +70,136 @@ def get_chapter(chapter_id):
         return jsonify(chapter)
     return jsonify({'error': 'Chapter not found'}), 404
 
+@app.route('/api/config')
+def get_config():
+    """Return public configuration for the frontend"""
+    openai_key = os.getenv('OPENAI_API_KEY', '')
+    # Consider OpenAI enabled only if we have a real API key (not placeholder)
+    openai_enabled = bool(openai_key and openai_key != 'your-openai-api-key-here')
+    
+    return jsonify({
+        'supabase': {
+            'url': os.getenv('SUPABASE_URL'),
+            'anonKey': os.getenv('SUPABASE_ANON_KEY')
+        },
+        'features': {
+            'openai_enabled': openai_enabled
+        }
+    })
+
+@app.route('/api/aristo', methods=['POST'])
+def ask_aristo():
+    try:
+        data = request.get_json()
+        user_input = data.get('input', '').strip()
+        
+        if not user_input:
+            return jsonify({'error': 'No input provided'}), 400
+        
+        # Load standard prompts
+        try:
+            with open('prompts.json', 'r') as f:
+                prompts_data = json.load(f)
+                standard_prompts = prompts_data['standard_prompts']
+        except FileNotFoundError:
+            return jsonify({'error': 'Prompts configuration not found'}), 500
+        except json.JSONDecodeError:
+            return jsonify({'error': 'Invalid prompts configuration'}), 500
+        
+        # Prepare messages for OpenAI
+        messages = []
+        
+        # Add standard prompts and replace placeholder with user input
+        for prompt in standard_prompts:
+            if prompt['role'] == 'system':
+                messages.append({
+                    'role': 'system',
+                    'content': prompt['content']
+                })
+            elif prompt['role'] == 'user':
+                # Replace placeholder with actual user input
+                content = prompt['content'].replace('{user_input}', user_input)
+                messages.append({
+                    'role': 'user',
+                    'content': content
+                })
+        
+        # Call OpenAI API
+        try:
+            response = openai_client.chat.completions.create(
+                model=os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo'),
+                messages=messages,
+                max_tokens=int(os.getenv('OPENAI_MAX_TOKENS', '500')),
+                temperature=float(os.getenv('OPENAI_TEMPERATURE', '0.7'))
+            )
+            
+            ai_response = response.choices[0].message.content.strip()
+            
+            return jsonify({
+                'success': True,
+                'response': ai_response,
+                'user_input': user_input
+            })
+            
+        except Exception as openai_error:
+            print(f"OpenAI API Error: {openai_error}")
+            
+            # Provide a fallback response when OpenAI is not available
+            fallback_response = f"""I understand you're asking about: "{user_input}"
+
+While I'd love to provide detailed AI-powered insights, it seems there's an issue connecting to the AI service right now. 
+
+Here are some general reading strategies that might help:
+• Try breaking down complex passages into smaller parts
+• Look for key themes and main ideas
+• Consider the context and background of what you're reading
+• Make connections to your own experiences or other texts
+• Don't hesitate to look up unfamiliar terms or concepts
+
+Please check your OpenAI API configuration and try again for more personalized assistance."""
+            
+            return jsonify({
+                'success': True,
+                'response': fallback_response,
+                'user_input': user_input,
+                'fallback': True
+            })
+            
+    except Exception as e:
+        print(f"Server Error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/test_supabase.html')
+def test_supabase():
+    return render_template('test_supabase.html')
+
+@app.route('/test_frontend.html')
+def test_frontend():
+    return render_template('test_frontend.html')
+
+@app.route('/api/debug')
+def debug_info():
+    """Debug endpoint to check configuration"""
+    return jsonify({
+        'env_vars': {
+            'SUPABASE_URL': os.getenv('SUPABASE_URL'),
+            'SUPABASE_ANON_KEY': os.getenv('SUPABASE_ANON_KEY')[:20] + '...' if os.getenv('SUPABASE_ANON_KEY') else None,
+            'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY')[:20] + '...' if os.getenv('OPENAI_API_KEY') else None,
+        },
+        'config_response': {
+            'supabase': {
+                'url': os.getenv('SUPABASE_URL'),
+                'anonKey': os.getenv('SUPABASE_ANON_KEY')
+            },
+            'features': {
+                'openai_enabled': bool(os.getenv('OPENAI_API_KEY') and os.getenv('OPENAI_API_KEY') != 'your-openai-api-key-here')
+            }
+        }
+    })
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(
+        debug=os.getenv('FLASK_DEBUG', 'True').lower() == 'true',
+        port=int(os.getenv('FLASK_PORT', '5001')),
+        host='0.0.0.0'  # Allow external connections for deployment
+    )

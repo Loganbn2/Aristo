@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Supabase Test</title>
+</head>
+<body>
+    <h1>Frontend Supabase Test</h1>
+    <div id="status">Starting test...</div>
+    <pre id="log"></pre>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        
+        function addLog(message) {
+            log.textContent += new Date().toISOString() + ': ' + message + '\n';
+            console.log(message);
+        }
+        
+        async function testSupabaseFrontend() {
+            try {
+                status.textContent = 'Testing...';
+                addLog('Starting frontend Supabase test');
+                
+                // Check if Supabase library is loaded
+                if (typeof supabase === 'undefined') {
+                    addLog('❌ Supabase library not loaded');
+                    status.textContent = 'Failed - Supabase library not loaded';
+                    return;
+                }
+                addLog('✅ Supabase library loaded');
+                
+                // Fetch configuration
+                addLog('Fetching configuration from /api/config...');
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                addLog('Config received: ' + JSON.stringify(config, null, 2));
+                
+                if (!config.supabase.url || !config.supabase.anonKey) {
+                    addLog('❌ Missing Supabase configuration');
+                    status.textContent = 'Failed - Missing configuration';
+                    return;
+                }
+                
+                // Create Supabase client
+                addLog('Creating Supabase client...');
+                const supabaseClient = supabase.createClient(config.supabase.url, config.supabase.anonKey);
+                addLog('✅ Supabase client created');
+                
+                // Test a query
+                addLog('Testing query to books table...');
+                const { data, error } = await supabaseClient
+                    .from('books')
+                    .select('*')
+                    .limit(3);
+                
+                if (error) {
+                    addLog('❌ Query failed: ' + JSON.stringify(error, null, 2));
+                    status.textContent = 'Failed - Query error';
+                } else {
+                    addLog('✅ Query successful!');
+                    addLog('Data received: ' + JSON.stringify(data, null, 2));
+                    status.textContent = `Success - Found ${data.length} books`;
+                }
+                
+            } catch (error) {
+                addLog('❌ Exception: ' + error.message);
+                status.textContent = 'Failed - Exception: ' + error.message;
+            }
+        }
+        
+        // Start test when page loads
+        window.addEventListener('load', testSupabaseFrontend);
+    </script>
+</body>
+</html>

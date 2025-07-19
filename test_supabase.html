@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Connection Test</title>
+</head>
+<body>
+    <h1>Supabase Connection Test</h1>
+    <button onclick="testSupabase()">Test Supabase Connection</button>
+    <pre id="output"></pre>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        async function testSupabase() {
+            const output = document.getElementById('output');
+            output.textContent = 'Testing Supabase connection...\n';
+            
+            try {
+                // Fetch config from our API
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                output.textContent += `Config loaded: ${JSON.stringify(config, null, 2)}\n`;
+                
+                if (!config.supabase.url || !config.supabase.anonKey) {
+                    output.textContent += 'ERROR: Missing Supabase configuration\n';
+                    return;
+                }
+                
+                // Create Supabase client
+                const supabaseClient = supabase.createClient(config.supabase.url, config.supabase.anonKey);
+                output.textContent += 'Supabase client created\n';
+                
+                // Test the connection by trying to select from a table
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('books')
+                        .select('*')
+                        .limit(1);
+                    
+                    if (error) {
+                        output.textContent += `Supabase query error: ${JSON.stringify(error, null, 2)}\n`;
+                    } else {
+                        output.textContent += `Supabase query successful! Data: ${JSON.stringify(data, null, 2)}\n`;
+                    }
+                } catch (queryError) {
+                    output.textContent += `Exception during query: ${queryError.message}\n`;
+                }
+                
+            } catch (error) {
+                output.textContent += `Error: ${error.message}\n`;
+            }
+        }
+    </script>
+</body>
+</html>

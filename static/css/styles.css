@@ -679,6 +679,65 @@ input[type="range"] {
     line-height: 1.4;
 }
 
+/* Floating Aristo Button */
+.aristo-floating-btn {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 56px;
+    height: 56px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1500;
+    font-family: 'Inter', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    box-shadow: 0 4px 16px rgba(0, 102, 204, 0.3);
+    transition: all 0.3s ease;
+    user-select: none;
+    border: none;
+    outline: none;
+    text-decoration: none;
+}
+
+.aristo-floating-btn:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 24px rgba(0, 102, 204, 0.4);
+    background: #0052a3;
+}
+
+.aristo-floating-btn:active {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 16px rgba(0, 102, 204, 0.3);
+}
+
+.aristo-floating-btn:focus {
+    outline: 2px solid rgba(0, 102, 204, 0.5);
+    outline-offset: 2px;
+}
+
+/* Subtle pulse animation */
+@keyframes aristoPulse {
+    0% {
+        box-shadow: 0 4px 16px rgba(0, 102, 204, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 16px rgba(0, 102, 204, 0.5);
+    }
+    100% {
+        box-shadow: 0 4px 16px rgba(0, 102, 204, 0.3);
+    }
+}
+
+.aristo-floating-btn {
+    animation: aristoPulse 3s ease-in-out infinite;
+}
+
 /* Floating Comment Button */
 .floating-comment-btn {
     position: fixed;
@@ -1145,6 +1204,200 @@ input[type="range"] {
     transform: none;
 }
 
+/* Aristo AI Modal */
+.aristo-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.aristo-modal-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.aristo-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    max-width: 700px;
+    width: calc(100% - 4rem);
+    max-height: 80vh;
+    background-color: var(--bg-color);
+    border: 2px solid var(--accent-color);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 102, 204, 0.3);
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+}
+
+.aristo-modal.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.aristo-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem 1rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+    background: linear-gradient(135deg, var(--accent-color)15, var(--accent-color)05);
+}
+
+.aristo-modal-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.aristo-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+}
+
+.aristo-modal-close:hover {
+    background-color: var(--hover-color);
+}
+
+.aristo-modal-content {
+    padding: 2rem;
+    height: calc(80vh - 160px);
+    overflow-y: auto;
+}
+
+.aristo-input-section {
+    margin-bottom: 2rem;
+}
+
+.aristo-label {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.aristo-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Crimson Text', serif;
+    font-size: 1rem;
+    line-height: 1.5;
+    resize: vertical;
+    transition: border-color 0.2s ease;
+}
+
+.aristo-textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.aristo-textarea::placeholder {
+    color: var(--text-color);
+    opacity: 0.5;
+}
+
+.aristo-response {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: var(--hover-color);
+    border-radius: 0.375rem;
+    border-left: 3px solid var(--accent-color);
+}
+
+.aristo-response-content {
+    font-family: 'Crimson Text', serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text-color);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.aristo-modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+}
+
+.aristo-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 100px;
+    border: 1px solid var(--border-color);
+}
+
+.aristo-btn-cancel {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.aristo-btn-cancel:hover {
+    background-color: var(--hover-color);
+}
+
+.aristo-btn-submit {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.aristo-btn-submit:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.aristo-btn-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Note indicators in margins */
 .note-indicator {
     position: absolute;
@@ -1221,6 +1474,15 @@ input[type="range"] {
     
     .floating-comment-btn::before {
         background-size: 14px 14px;
+    }
+
+    /* Aristo floating button on mobile */
+    .aristo-floating-btn {
+        width: 48px;
+        height: 48px;
+        bottom: 1rem;
+        left: 1rem;
+        font-size: 1.25rem;
     }
     
     .chapter-navigation {
@@ -1339,6 +1601,44 @@ input[type="range"] {
 
     .add-book-btn-cancel,
     .add-book-btn-save {
+        width: 100%;
+    }
+
+    /* Aristo Modal Responsive */
+    .aristo-modal {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.95);
+        width: calc(100% - 2rem);
+        max-width: none;
+        max-height: 90vh;
+    }
+
+    .aristo-modal.show {
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    .aristo-modal-header {
+        padding: 1rem;
+    }
+
+    .aristo-modal-content {
+        padding: 1rem;
+        height: calc(90vh - 160px);
+    }
+
+    .aristo-textarea {
+        min-height: 100px;
+        font-size: 0.875rem;
+    }
+
+    .aristo-modal-actions {
+        flex-direction: column;
+        padding: 1rem;
+    }
+
+    .aristo-btn-cancel,
+    .aristo-btn-submit {
         width: 100%;
     }
 }

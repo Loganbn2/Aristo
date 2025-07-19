@@ -15,10 +15,15 @@ class BookReader {
             width: 700
         };
         
-        this.init();
+        // Don't call init() immediately - let the initialization happen externally
     }
 
     async init() {
+        // Ensure Supabase is ready before loading books
+        if (typeof ensureSupabaseReady === 'function') {
+            await ensureSupabaseReady();
+        }
+        
         await this.loadAvailableBooks();
         this.setupEventListeners();
         this.loadSettings();
@@ -276,6 +281,43 @@ class BookReader {
             this.handleFileSelection(e);
         });
 
+        // Aristo floating button event listener
+        document.getElementById('aristoFloatingBtn').addEventListener('click', () => {
+            this.handleAristoButtonClick();
+        });
+
+        document.getElementById('aristoFloatingBtn').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.handleAristoButtonClick();
+            }
+        });
+
+        // Aristo modal event listeners
+        document.getElementById('aristoModalClose').addEventListener('click', () => {
+            this.closeAristoModal();
+        });
+
+        document.getElementById('aristoModalOverlay').addEventListener('click', () => {
+            this.closeAristoModal();
+        });
+
+        document.getElementById('aristoCancelBtn').addEventListener('click', () => {
+            this.closeAristoModal();
+        });
+
+        document.getElementById('aristoSubmitBtn').addEventListener('click', () => {
+            this.submitAristoQuery();
+        });
+
+        // Enter key in Aristo textarea
+        document.getElementById('aristoTextarea').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                this.submitAristoQuery();
+            }
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft' && e.ctrlKey) {
@@ -288,6 +330,7 @@ class BookReader {
                 this.closePanel('menuPanel');
                 this.closePanel('settingsPanel');
                 this.closeTextBubble();
+                this.closeAristoModal();
             }
         });
 
@@ -1743,10 +1786,156 @@ class BookReader {
             reader.readAsText(file);
         });
     }
+
+    // Aristo floating button handler
+    handleAristoButtonClick() {
+        console.log('Aristo floating button clicked!');
+        
+        // Add visual feedback
+        const btn = document.getElementById('aristoFloatingBtn');
+        btn.style.transform = 'translateY(-2px) scale(1.1)';
+        btn.style.boxShadow = '0 8px 32px rgba(0, 102, 204, 0.6)';
+        
+        // Reset visual feedback
+        setTimeout(() => {
+            btn.style.transform = '';
+            btn.style.boxShadow = '';
+        }, 200);
+        
+        // Open the Aristo AI modal
+        this.openAristoModal();
+    }
+
+    openAristoModal() {
+        const modal = document.getElementById('aristoModal');
+        const overlay = document.getElementById('aristoModalOverlay');
+        const textarea = document.getElementById('aristoTextarea');
+        const responseDiv = document.getElementById('aristoResponse');
+        
+        // Clear previous content
+        textarea.value = '';
+        responseDiv.style.display = 'none';
+        
+        // Show modal
+        overlay.classList.add('show');
+        modal.classList.add('show');
+        
+        // Focus on textarea
+        setTimeout(() => {
+            textarea.focus();
+        }, 300);
+        
+        // Prevent body scrolling
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeAristoModal() {
+        const modal = document.getElementById('aristoModal');
+        const overlay = document.getElementById('aristoModalOverlay');
+        
+        modal.classList.remove('show');
+        overlay.classList.remove('show');
+        
+        // Re-enable body scrolling
+        document.body.style.overflow = 'auto';
+    }
+
+    async submitAristoQuery() {
+        const textarea = document.getElementById('aristoTextarea');
+        const submitBtn = document.getElementById('aristoSubmitBtn');
+        const responseDiv = document.getElementById('aristoResponse');
+        const responseContent = document.getElementById('aristoResponseContent');
+        const userInput = textarea.value.trim();
+        
+        if (!userInput) {
+            alert('Please enter a question or text to analyze.');
+            return;
+        }
+        
+        // Disable submit button and show loading state
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Thinking...';
+        
+        // Hide previous response
+        responseDiv.style.display = 'none';
+        
+        try {
+            // Call the Flask API
+            const response = await fetch('/api/aristo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    input: userInput
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Show the response
+                responseContent.textContent = data.response;
+                responseDiv.style.display = 'block';
+                
+                // Show a subtle indication if it's a fallback response
+                if (data.fallback) {
+                    responseContent.style.borderLeft = '3px solid orange';
+                    responseContent.title = 'Fallback response - OpenAI API may not be configured';
+                } else {
+                    responseContent.style.borderLeft = '3px solid var(--accent-color)';
+                    responseContent.title = 'AI-powered response from Aristo';
+                }
+                
+                // Scroll response into view
+                responseDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+            } else {
+                throw new Error(data.error || 'Unknown error occurred');
+            }
+            
+        } catch (error) {
+            console.error('Error calling Aristo API:', error);
+            
+            // Show error message
+            responseContent.textContent = `Sorry, I encountered an error while processing your request: ${error.message}`;
+            responseContent.style.borderLeft = '3px solid red';
+            responseDiv.style.display = 'block';
+            
+        } finally {
+            // Re-enable submit button
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Ask Aristo';
+        }
+    }
+
+    showAristoMenu() {
+        // This method is no longer needed since we're opening the modal directly
+        // Keeping it for backwards compatibility
+        this.openAristoModal();
+    }
 }
 
 // Initialize the app when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.bookReader = new BookReader();
-    console.log('BookReader initialized and available as window.bookReader');
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Wait for Supabase to be ready before initializing BookReader
+        if (typeof ensureSupabaseReady === 'function') {
+            console.log('Waiting for Supabase initialization...');
+            await ensureSupabaseReady();
+            console.log('✅ Supabase initialization complete');
+        }
+        
+        // Create and initialize BookReader
+        window.bookReader = new BookReader();
+        await window.bookReader.init();
+        console.log('✅ BookReader initialized and available as window.bookReader');
+        
+    } catch (error) {
+        console.error('❌ Error during app initialization:', error);
+        // Still create BookReader but it will use mock data
+        window.bookReader = new BookReader();
+        await window.bookReader.init();
+        console.log('⚠️ BookReader initialized with fallback data');
+    }
 });

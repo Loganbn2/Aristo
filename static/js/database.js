@@ -1,10 +1,48 @@
-// Supabase configuration
-// Replace these with your actual Supabase project credentials
-const SUPABASE_URL = 'https://nrgilbecgssjgafqulth.supabase.co'  // Should look like: https://your-project.supabase.co
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZ2lsYmVjZ3NzamdhZnF1bHRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI3OTI1NDIsImV4cCI6MjA2ODM2ODU0Mn0.fxFXgDuu9ZL8vDtXxCPiQpA2-7dDKihh9DT5IH7U9cU'  // Your project's anon/public key
+// Supabase configuration - will be loaded from API
+let SUPABASE_URL = null;
+let SUPABASE_ANON_KEY = null;
+let supabaseClient = null;
 
-// Initialize Supabase client
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Promise that resolves when Supabase is initialized
+let supabaseInitialized = null;
+
+// Initialize Supabase client with configuration from backend
+async function initializeSupabase() {
+    try {
+        console.log('Fetching Supabase configuration...');
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        
+        console.log('Received config:', config);
+        
+        SUPABASE_URL = config.supabase.url;
+        SUPABASE_ANON_KEY = config.supabase.anonKey;
+        
+        console.log('Setting Supabase config:', {
+            url: SUPABASE_URL,
+            keyLength: SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY.length : 0
+        });
+        
+        if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log('✅ Supabase client initialized successfully');
+            console.log('Client object:', supabaseClient);
+        } else {
+            console.log('⚠️ Supabase configuration not available, using mock data');
+        }
+    } catch (error) {
+        console.error('❌ Error loading configuration:', error);
+        console.log('Falling back to mock data');
+    }
+}
+
+// Initialize and store the promise
+supabaseInitialized = initializeSupabase();
+
+// Helper function to ensure Supabase is ready before database operations
+async function ensureSupabaseReady() {
+    await supabaseInitialized;
+}
 
 // Mock data for testing when Supabase isn't configured
 const MOCK_DATA = {
@@ -51,15 +89,28 @@ const MOCK_DATA = {
 
 // Check if Supabase is properly configured
 const isSupabaseConfigured = () => {
-    return SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && 
-           SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE' &&
+    const configured = supabaseClient !== null && 
+           SUPABASE_URL && 
+           SUPABASE_ANON_KEY &&
            SUPABASE_URL.includes('supabase.co');
+    
+    console.log('Supabase configuration check:', {
+        supabaseClient: supabaseClient !== null,
+        hasUrl: !!SUPABASE_URL,
+        hasKey: !!SUPABASE_ANON_KEY,
+        urlValid: SUPABASE_URL ? SUPABASE_URL.includes('supabase.co') : false,
+        configured
+    });
+    
+    return configured;
 };
 
 // Database service for book operations
 class DatabaseService {
     // Books
     static async getBooks() {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return MOCK_DATA.books;
         }
@@ -74,6 +125,8 @@ class DatabaseService {
     }
 
     static async getBook(bookId) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             const book = MOCK_DATA.books.find(book => book.id === bookId);
             if (book) {
@@ -104,6 +157,8 @@ class DatabaseService {
     }
 
     static async createBook(book) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return { ...book, id: String(MOCK_DATA.books.length + 1), created_at: new Date().toISOString() };
         }
@@ -120,6 +175,8 @@ class DatabaseService {
 
     // Add a complete book with chapters
     static async addBook(bookJson) {
+        await ensureSupabaseReady();
+        
         try {
             // Parse the JSON if it's a string
             const bookData = typeof bookJson === 'string' ? JSON.parse(bookJson) : bookJson;
@@ -219,6 +276,8 @@ class DatabaseService {
 
     // Chapters
     static async getChapter(chapterId) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return MOCK_DATA.chapters.find(chapter => chapter.id === chapterId);
         }
@@ -234,6 +293,8 @@ class DatabaseService {
     }
 
     static async getChapterByNumber(bookId, chapterNumber) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return MOCK_DATA.chapters.find(chapter => chapter.book_id === bookId && chapter.chapter_number === chapterNumber);
         }
@@ -250,6 +311,8 @@ class DatabaseService {
     }
 
     static async createChapter(chapter) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return { ...chapter, id: String(MOCK_DATA.chapters.length + 1) };
         }
@@ -266,6 +329,8 @@ class DatabaseService {
 
     // Highlights
     static async getHighlights(bookId, chapterId = null) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return []; // Return empty array for highlights in mock
         }
@@ -286,6 +351,8 @@ class DatabaseService {
     }
 
     static async createHighlight(highlight) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return { ...highlight, id: 'mock-highlight-id' }; // Return mock highlight
         }
@@ -301,6 +368,8 @@ class DatabaseService {
     }
 
     static async updateHighlight(id, updates) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return { id, ...updates }; // Return mock updated highlight
         }
@@ -317,6 +386,8 @@ class DatabaseService {
     }
 
     static async deleteHighlight(id) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return; // Do nothing in mock
         }
@@ -331,6 +402,8 @@ class DatabaseService {
 
     // Reading Progress
     static async getReadingProgress(bookId) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return null; // Return null in mock
         }
@@ -346,6 +419,8 @@ class DatabaseService {
     }
 
     static async updateReadingProgress(bookId, progress) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return { book_id: bookId, ...progress, last_read_at: new Date().toISOString() }; // Return mock progress
         }
@@ -366,6 +441,8 @@ class DatabaseService {
 
     // Notes
     static async getNotes(bookId, chapterId = null) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return []; // Return empty array for notes in mock
         }
@@ -386,6 +463,8 @@ class DatabaseService {
     }
 
     static async createNote(note) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return { 
                 ...note, 
@@ -406,6 +485,8 @@ class DatabaseService {
     }
 
     static async updateNote(id, updates) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return { 
                 id, 
@@ -426,6 +507,8 @@ class DatabaseService {
     }
 
     static async deleteNote(id) {
+        await ensureSupabaseReady();
+        
         if (!isSupabaseConfigured()) {
             return; // Do nothing in mock
         }
