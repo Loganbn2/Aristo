@@ -92,6 +92,7 @@ def ask_aristo():
     try:
         data = request.get_json()
         user_input = data.get('input', '').strip()
+        chapter_context = data.get('chapterContext')
         
         if not user_input:
             return jsonify({'error': 'No input provided'}), 400
@@ -109,7 +110,7 @@ def ask_aristo():
         # Prepare messages for OpenAI
         messages = []
         
-        # Add standard prompts and replace placeholder with user input
+        # Add standard prompts and replace placeholder with user input and context
         for prompt in standard_prompts:
             if prompt['role'] == 'system':
                 messages.append({
@@ -117,8 +118,19 @@ def ask_aristo():
                     'content': prompt['content']
                 })
             elif prompt['role'] == 'user':
+                # Build the content with chapter context if available
+                content = ""
+                
+                if chapter_context:
+                    content += f"CURRENT READING CONTEXT:\n"
+                    content += f"Chapter {chapter_context['chapterNumber']}: {chapter_context['title']}\n\n"
+                    content += f"Chapter Content:\n{chapter_context['content']}\n\n"
+                    content += f"---\n\n"
+                
                 # Replace placeholder with actual user input
-                content = prompt['content'].replace('{user_input}', user_input)
+                user_prompt = prompt['content'].replace('{user_input}', user_input)
+                content += user_prompt
+                
                 messages.append({
                     'role': 'user',
                     'content': content

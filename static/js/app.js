@@ -1860,6 +1860,19 @@ class BookReader {
         responseDiv.style.display = 'none';
         
         try {
+            // Get current chapter content for context
+            let chapterContext = null;
+            if (this.currentChapterId && this.book) {
+                const currentChapter = this.book.chapters.find(ch => ch.id === this.currentChapterId);
+                if (currentChapter) {
+                    chapterContext = {
+                        title: currentChapter.title,
+                        content: currentChapter.content,
+                        chapterNumber: this.currentChapterNumber
+                    };
+                }
+            }
+
             // Call the Flask API
             const response = await fetch('/api/aristo', {
                 method: 'POST',
@@ -1867,7 +1880,8 @@ class BookReader {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    input: userInput
+                    input: userInput,
+                    chapterContext: chapterContext
                 })
             });
             
