@@ -118,6 +118,105 @@ class DatabaseService {
         return data;
     }
 
+    // Add a complete book with chapters
+    static async addBook(bookJson) {
+        try {
+            // Parse the JSON if it's a string
+            const bookData = typeof bookJson === 'string' ? JSON.parse(bookJson) : bookJson;
+            
+            // Validate required fields
+            if (!bookData.title || !bookData.author) {
+                throw new Error('Book must have title and author');
+            }
+            
+            if (!bookData.chapters || !Array.isArray(bookData.chapters)) {
+                throw new Error('Book must have chapters array');
+            }
+
+            // Create the book record
+            const bookRecord = {
+                title: bookData.title,
+                author: bookData.author,
+                description: bookData.description || '',
+                created_at: new Date().toISOString()
+            };
+
+            let book;
+            if (!isSupabaseConfigured()) {
+                // Mock mode - add to mock data
+                book = { 
+                    ...bookRecord, 
+                    id: String(MOCK_DATA.books.length + 1)
+                };
+                MOCK_DATA.books.push(book);
+            } else {
+                // Create book in Supabase
+                const { data, error } = await supabaseClient
+                    .from('books')
+                    .insert(bookRecord)
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+                book = data;
+            }
+
+            // Create chapters
+            const chapters = [];
+            for (const chapterData of bookData.chapters) {
+                if (!chapterData.number || !chapterData.title || !chapterData.text) {
+                    console.warn('Skipping invalid chapter:', chapterData);
+                    continue;
+                }
+
+                const chapterRecord = {
+                    book_id: book.id,
+                    chapter_number: chapterData.number,
+                    title: chapterData.title,
+                    content: chapterData.text,
+                    word_count: chapterData.text.split(/\s+/).length
+                };
+
+                if (!isSupabaseConfigured()) {
+                    // Mock mode
+                    const chapter = {
+                        ...chapterRecord,
+                        id: String(MOCK_DATA.chapters.length + 1)
+                    };
+                    MOCK_DATA.chapters.push(chapter);
+                    chapters.push(chapter);
+                } else {
+                    // Create chapter in Supabase
+                    const { data, error } = await supabaseClient
+                        .from('chapters')
+                        .insert(chapterRecord)
+                        .select()
+                        .single();
+                    
+                    if (error) {
+                        console.error('Error creating chapter:', error);
+                        continue;
+                    }
+                    chapters.push(data);
+                }
+            }
+
+            return {
+                book,
+                chapters,
+                success: true,
+                message: `Successfully added "${book.title}" with ${chapters.length} chapters`
+            };
+
+        } catch (error) {
+            console.error('Error adding book:', error);
+            return {
+                success: false,
+                message: error.message || 'Failed to add book'
+            };
+        }
+    }
+
     // Chapters
     static async getChapter(chapterId) {
         if (!isSupabaseConfigured()) {

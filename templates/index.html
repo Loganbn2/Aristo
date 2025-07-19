@@ -110,6 +110,7 @@
                     <select id="bookSelector" class="book-selector">
                         <option value="">Loading books...</option>
                     </select>
+                    <button id="addBookBtn" class="add-book-btn">Add Book</button>
                 </div>
                 <h3>Table of Contents</h3>
                 <div id="tableOfContents" class="table-of-contents">
@@ -157,6 +158,51 @@
                 <div class="note-modal-actions">
                     <button id="noteCancelBtn" class="note-btn note-btn-cancel">Cancel</button>
                     <button id="noteSaveBtn" class="note-btn note-btn-save">Save Note</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Book Modal Overlay -->
+        <div id="addBookModalOverlay" class="add-book-modal-overlay"></div>
+        
+        <!-- Add Book Modal -->
+        <div id="addBookModal" class="add-book-modal">
+            <div class="add-book-modal-header">
+                <h2 class="add-book-modal-title">Add New Book</h2>
+                <button id="addBookModalClose" class="add-book-modal-close">×</button>
+            </div>
+            <div class="add-book-modal-content">
+                <div class="add-book-input-section">
+                    <label for="bookJsonFile" class="add-book-label">Select Book JSON File:</label>
+                    <div class="file-input-container">
+                        <input type="file" id="bookJsonFile" class="add-book-file-input" accept=".json" />
+                        <label for="bookJsonFile" class="file-input-label">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                            </svg>
+                            Choose JSON File
+                        </label>
+                    </div>
+                    <div id="selectedFileName" class="selected-file-name"></div>
+                    <div class="add-book-example">
+                        <p>Expected format:</p>
+                        <pre>{
+  "title": "Book Title",
+  "author": "Author Name",
+  "description": "Book description",
+  "chapters": [
+    {
+      "number": 1,
+      "title": "Chapter Title",
+      "text": "Chapter content..."
+    }
+  ]
+}</pre>
+                    </div>
+                </div>
+                <div class="add-book-modal-actions">
+                    <button id="addBookCancelBtn" class="add-book-btn add-book-btn-cancel">Cancel</button>
+                    <button id="addBookSaveBtn" class="add-book-btn add-book-btn-save">Add Book</button>
                 </div>
             </div>
         </div>

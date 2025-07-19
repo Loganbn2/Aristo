@@ -250,6 +250,32 @@ class BookReader {
             this.saveNote();
         });
 
+        // Add Book modal event listeners
+        document.getElementById('addBookBtn').addEventListener('click', () => {
+            this.openAddBookModal();
+        });
+
+        document.getElementById('addBookModalClose').addEventListener('click', () => {
+            this.closeAddBookModal();
+        });
+
+        document.getElementById('addBookModalOverlay').addEventListener('click', () => {
+            this.closeAddBookModal();
+        });
+
+        document.getElementById('addBookCancelBtn').addEventListener('click', () => {
+            this.closeAddBookModal();
+        });
+
+        document.getElementById('addBookSaveBtn').addEventListener('click', () => {
+            this.addBookFromJson();
+        });
+
+        // File input event listener
+        document.getElementById('bookJsonFile').addEventListener('change', (e) => {
+            this.handleFileSelection(e);
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft' && e.ctrlKey) {
@@ -828,6 +854,9 @@ class BookReader {
             
             // Store the selected book for next session
             localStorage.setItem('aristoLastBook', bookId);
+            
+            // Close menu panel
+            this.closePanel('menuPanel');
             
         } catch (error) {
             console.error('Error switching book:', error);
@@ -1606,6 +1635,113 @@ class BookReader {
         });
         
         console.log('=== END NOTE TEST ===');
+    }
+
+    // Add Book Modal Methods
+    openAddBookModal() {
+        const modal = document.getElementById('addBookModal');
+        const overlay = document.getElementById('addBookModalOverlay');
+        const fileInput = document.getElementById('bookJsonFile');
+        const selectedFileName = document.getElementById('selectedFileName');
+        
+        // Clear previous file selection
+        fileInput.value = '';
+        selectedFileName.classList.remove('show');
+        selectedFileName.textContent = '';
+        
+        // Show modal
+        overlay.classList.add('show');
+        modal.classList.add('show');
+    }
+
+    closeAddBookModal() {
+        const modal = document.getElementById('addBookModal');
+        const overlay = document.getElementById('addBookModalOverlay');
+        
+        modal.classList.remove('show');
+        overlay.classList.remove('show');
+    }
+
+    handleFileSelection(event) {
+        const file = event.target.files[0];
+        const selectedFileName = document.getElementById('selectedFileName');
+        
+        if (file) {
+            if (file.type === 'application/json' || file.name.toLowerCase().endsWith('.json')) {
+                selectedFileName.textContent = `Selected: ${file.name}`;
+                selectedFileName.classList.add('show');
+            } else {
+                alert('Please select a valid JSON file');
+                event.target.value = '';
+                selectedFileName.classList.remove('show');
+                selectedFileName.textContent = '';
+            }
+        } else {
+            selectedFileName.classList.remove('show');
+            selectedFileName.textContent = '';
+        }
+    }
+
+    async addBookFromJson() {
+        const fileInput = document.getElementById('bookJsonFile');
+        const saveBtn = document.getElementById('addBookSaveBtn');
+        
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Please select a JSON file');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        
+        // Disable button and show loading state
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Adding Book...';
+
+        try {
+            // Read the file content
+            const fileContent = await this.readFileAsText(file);
+            
+            // Add the book using the file content
+            const result = await DatabaseService.addBook(fileContent);
+            
+            if (result.success) {
+                // Success! Close modal and refresh book list
+                this.closeAddBookModal();
+                
+                // Refresh the available books list
+                await this.loadAvailableBooks();
+                
+                // Show success message
+                alert(result.message);
+                
+                // Optionally switch to the newly added book
+                if (result.book && result.book.id) {
+                    await this.switchBook(result.book.id);
+                }
+                
+            } else {
+                // Show error message
+                alert('Error adding book: ' + result.message);
+            }
+            
+        } catch (error) {
+            console.error('Error adding book:', error);
+            alert('Error adding book: ' + error.message);
+        } finally {
+            // Re-enable button
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Add Book';
+        }
+    }
+
+    // Helper method to read file as text
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+        });
     }
 }
 
