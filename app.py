@@ -147,11 +147,36 @@ def ask_aristo():
             
             ai_response = response.choices[0].message.content.strip()
             
-            return jsonify({
-                'success': True,
-                'response': ai_response,
-                'user_input': user_input
-            })
+            # Parse the JSON array response from Aristo
+            try:
+                parsed_response = json.loads(ai_response)
+                if isinstance(parsed_response, list) and len(parsed_response) >= 2:
+                    # Extract the answer (first item) and label (second item)
+                    answer = parsed_response[0]
+                    label = parsed_response[1]
+                    
+                    return jsonify({
+                        'success': True,
+                        'response': answer,  # Only return the answer to display
+                        'label': label,      # Include label for backend use
+                        'user_input': user_input
+                    })
+                else:
+                    # Fallback if response isn't in expected format
+                    return jsonify({
+                        'success': True,
+                        'response': ai_response,
+                        'user_input': user_input,
+                        'note': 'Response not in expected JSON array format'
+                    })
+            except json.JSONDecodeError:
+                # Fallback if response isn't valid JSON
+                return jsonify({
+                    'success': True,
+                    'response': ai_response,
+                    'user_input': user_input,
+                    'note': 'Response not in JSON format'
+                })
             
         except Exception as openai_error:
             print(f"OpenAI API Error: {openai_error}")
