@@ -102,7 +102,7 @@ body {
 
 /* Progress Bar */
 .progress-container {
-    padding: 8px 16px 8px 40px; /* Added 25px to left side */
+    padding: 8px 16px 8px 16px; /* Added 25px to left side */
     background-color: var(--bg-color);
     display: flex;
     align-items: center;
