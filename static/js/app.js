@@ -538,6 +538,8 @@ class BookReader {
         
         // First pass: identify all highlight positions
         highlights.forEach((highlight, term) => {
+            console.log('Processing highlight with map key:', term, 'and selectedText:', highlight.selectedText);
+            
             // Escape special regex characters in the selected text
             const escapedText = highlight.selectedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             // Use a more flexible regex that doesn't require word boundaries
@@ -563,6 +565,7 @@ class BookReader {
                 
                 highlightMap.get(key).highlights.push({
                     term: highlight.selectedText,
+                    originalKey: term, // This is the actual map key (lowercase selected text)
                     type: highlight.type,
                     data: highlight
                 });
@@ -581,20 +584,34 @@ class BookReader {
             
             if (highlightData.length === 1) {
                 // Single highlight
-                const { term, type, data } = highlightData[0];
+                const { term, originalKey, type, data } = highlightData[0];
                 const title = data.title || 'Highlight';
                 const cssClass = this.getHighlightCssClass(type);
-                const replacement = `<span class="highlight ${cssClass}" data-highlight="${term}" data-type="${type}" data-title="${title}">${text}</span>`;
+                // Use the original key from the map instead of the term
+                const replacement = `<span class="highlight ${cssClass}" data-highlight="${originalKey}" data-type="${type}" data-title="${title}">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
-                console.log('Applied single highlight:', text, 'with type:', type, 'and CSS class:', cssClass);
+                console.log('Applied single highlight:', {
+                    text: text.substring(0, 50) + '...',
+                    type: type,
+                    cssClass: cssClass,
+                    dataHighlight: originalKey,
+                    originalTerm: term,
+                    mapKey: originalKey,
+                    replacement: replacement.substring(0, 200) + '...'
+                });
             } else {
                 // Multiple overlapping highlights
                 const typeClasses = highlightData.map(h => this.getHighlightCssClass(h.type)).join(' ');
-                const terms = highlightData.map(h => h.term).join('|');
+                const originalKeys = highlightData.map(h => h.originalKey).join('|');
                 const titles = highlightData.map(h => h.data.title || 'Highlight').join(' | ');
-                const replacement = `<span class="highlight highlight-stack ${typeClasses}" data-highlight="${terms}" data-type="multiple" data-title="${titles}">${text}</span>`;
+                const replacement = `<span class="highlight highlight-stack ${typeClasses}" data-highlight="${originalKeys}" data-type="multiple" data-title="${titles}">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
-                console.log('Applied multiple highlights:', text, 'with CSS classes:', typeClasses);
+                console.log('Applied multiple highlights:', {
+                    text: text,
+                    typeClasses: typeClasses,
+                    originalKeys: originalKeys,
+                    replacement: replacement
+                });
             }
         });
         
@@ -602,22 +619,131 @@ class BookReader {
     }
 
     setupHighlightListeners() {
-        // Add event listeners to all highlights
-        document.querySelectorAll('.highlight').forEach(highlight => {
-            highlight.addEventListener('click', (e) => {
-                e.preventDefault();
-                const highlightData = e.target.dataset.highlight;
-                const type = e.target.dataset.type;
-                
+        console.log('=== SETTING UP HIGHLIGHT LISTENERS ===');
+        console.log('Current chapter ID:', this.currentChapterId);
+        console.log('Highlights in cache:', this.chapterHighlights.get(this.currentChapterId));
+        
+        // Remove any existing event listeners first
+        const textContent = document.getElementById('textContent');
+        if (textContent._highlightHandler) {
+            textContent.removeEventListener('click', textContent._highlightHandler);
+        }
+        
+        // Use event delegation for better reliability
+        const highlightClickHandler = (e) => {
+            console.log('Text content clicked, checking for highlight...');
+            
+            // Find the closest highlight element
+            const highlight = e.target.closest('.highlight');
+            
+            if (!highlight) {
+                console.log('Click was not on a highlight');
+                return; // Not a highlight click
+            }
+            
+            console.log('🎯 HIGHLIGHT CLICKED VIA DELEGATION!', {
+                target: e.target,
+                highlight: highlight,
+                dataset: highlight.dataset,
+                classList: highlight.classList.toString(),
+                textContent: highlight.textContent.substring(0, 50)
+            });
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const highlightData = highlight.dataset.highlight;
+            const type = highlight.dataset.type;
+            
+            console.log('Processing highlight click:', {
+                highlightData: highlightData,
+                type: type
+            });
+            
+            if (!highlightData) {
+                console.error('❌ No highlight data found on clicked element');
+                return;
+            }
+            
+            try {
                 if (type === 'multiple') {
-                    // Handle multiple overlapping highlights
+                    console.log('📚 Showing multiple highlights');
                     this.showMultipleHighlights(highlightData.split('|'));
                 } else {
-                    // Single highlight
+                    console.log('📖 Showing single highlight for term:', highlightData?.substring(0, 50) + '...');
+                    console.log('Full term length:', highlightData?.length);
                     this.showTextBubble(highlightData);
+                }
+            } catch (error) {
+                console.error('❌ Error showing highlight:', error);
+            }
+        };
+        
+        // Store the handler reference for cleanup
+        textContent._highlightHandler = highlightClickHandler;
+        textContent.addEventListener('click', highlightClickHandler);
+        console.log('✅ Event delegation listener added to textContent');
+        
+        // Also add direct listeners as backup
+        const highlights = document.querySelectorAll('.highlight');
+        console.log(`Found ${highlights.length} highlights to set up listeners`);
+        
+        if (highlights.length === 0) {
+            console.warn('⚠️ No highlights found! This might be the issue.');
+            console.log('HTML content preview:', textContent.innerHTML.substring(0, 500));
+        }
+        
+        highlights.forEach((highlight, index) => {
+            console.log(`Setting up direct listener for highlight ${index}:`, {
+                text: highlight.textContent.substring(0, 50),
+                dataset: highlight.dataset,
+                classList: highlight.classList.toString(),
+                outerHTML: highlight.outerHTML.substring(0, 200)
+            });
+            
+            // Style the highlight to show it's clickable
+            highlight.style.cursor = 'pointer';
+            highlight.title = `Click to view: ${highlight.dataset.title || 'Highlight'}`;
+            
+            // Add a visual test - change background on hover
+            highlight.addEventListener('mouseenter', () => {
+                console.log('🖱️ Mouse entered highlight:', highlight.textContent.substring(0, 30));
+                highlight.style.opacity = '0.8';
+            });
+            
+            highlight.addEventListener('mouseleave', () => {
+                highlight.style.opacity = '1';
+            });
+            
+            // Add direct listener as backup
+            highlight.addEventListener('click', (e) => {
+                console.log('🎯 DIRECT HIGHLIGHT CLICK:', highlight.textContent.substring(0, 30));
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const highlightData = highlight.dataset.highlight;
+                const type = highlight.dataset.type;
+                
+                console.log('Direct click - Highlight data:', highlightData, 'Type:', type);
+                
+                if (!highlightData) {
+                    console.error('❌ No highlight data found on direct clicked element');
+                    return;
+                }
+                
+                try {
+                    if (type === 'multiple') {
+                        this.showMultipleHighlights(highlightData.split('|'));
+                    } else {
+                        this.showTextBubble(highlightData);
+                    }
+                } catch (error) {
+                    console.error('❌ Error in direct click handler:', error);
                 }
             });
         });
+        
+        console.log('=== HIGHLIGHT LISTENERS SETUP COMPLETE ===');
         
         // Set up margin tags
         this.setupMarginTags();
@@ -685,17 +811,117 @@ class BookReader {
         });
     }
 
-    showTextBubble(term) {
-        const highlights = this.chapterHighlights.get(this.currentChapterId);
-        const highlight = highlights?.get(term.toLowerCase());
+    // Test function to manually trigger text bubble (for debugging)
+    testTextBubble() {
+        console.log('🧪 Testing text bubble manually...');
         
-        if (!highlight) return;
+        const highlights = this.chapterHighlights.get(this.currentChapterId);
+        if (!highlights || highlights.size === 0) {
+            console.log('❌ No highlights available for testing');
+            return;
+        }
+        
+        // Get the first highlight to test with
+        const firstKey = highlights.keys().next().value;
+        const firstHighlight = highlights.get(firstKey);
+        
+        console.log('Testing with highlight:', firstKey, firstHighlight);
+        
+        this.showTextBubble(firstKey);
+    }
+
+    // Test function to check if highlights exist in DOM
+    testHighlightsInDOM() {
+        console.log('🧪 Testing highlights in DOM...');
+        
+        const highlights = document.querySelectorAll('.highlight');
+        console.log(`Found ${highlights.length} highlight elements in DOM`);
+        
+        highlights.forEach((highlight, index) => {
+            console.log(`Highlight ${index}:`, {
+                text: highlight.textContent.substring(0, 50),
+                dataset: highlight.dataset,
+                classList: highlight.classList.toString(),
+                clickable: highlight.style.cursor === 'pointer'
+            });
+        });
+        
+        return highlights.length;
+    }
+
+    showTextBubble(term) {
+        console.log('🔍 showTextBubble called with term:', term.substring(0, 100) + '...');
+        console.log('Current chapter ID:', this.currentChapterId);
+        
+        const highlights = this.chapterHighlights.get(this.currentChapterId);
+        console.log('Available highlights map size:', highlights?.size);
+        
+        if (!highlights) {
+            console.error('❌ No highlights found for current chapter');
+            return;
+        }
+        
+        // First try exact match
+        let highlight = highlights.get(term);
+        console.log('Exact match result:', !!highlight);
+        
+        // If no exact match, try lowercase
+        if (!highlight) {
+            highlight = highlights.get(term.toLowerCase());
+            console.log('Lowercase match result:', !!highlight);
+        }
+        
+        if (!highlight) {
+            console.error('❌ Highlight not found for term:', term.substring(0, 50) + '...');
+            console.log('Available highlight keys:');
+            Array.from(highlights.keys()).forEach((key, index) => {
+                console.log(`  ${index}: "${key.substring(0, 50)}..."`);
+            });
+            
+            // Try to find the highlight by partial matching
+            let foundHighlight = null;
+            for (const [key, highlightData] of highlights) {
+                // Check if the term contains the key or vice versa
+                if (term.toLowerCase().includes(key) || key.includes(term.toLowerCase())) {
+                    console.log('Found partial match with key:', key.substring(0, 50) + '...');
+                    foundHighlight = highlightData;
+                    break;
+                }
+            }
+            
+            if (foundHighlight) {
+                console.log('Using found highlight via partial match');
+                highlight = foundHighlight;
+            } else {
+                console.error('❌ No match found even with partial matching');
+                return;
+            }
+        }
 
         const bubble = document.getElementById('textBubble');
         const overlay = document.getElementById('textBubbleOverlay');
         const title = document.getElementById('textBubbleTitle');
         const type = document.getElementById('textBubbleType');
         const content = document.getElementById('textBubbleContent');
+
+        console.log('Text bubble elements:', {
+            bubble: !!bubble,
+            overlay: !!overlay,
+            title: !!title,
+            type: !!type,
+            content: !!content
+        });
+
+        if (!bubble || !overlay || !title || !type || !content) {
+            console.error('❌ Missing text bubble elements in DOM');
+            return;
+        }
+
+        console.log('Setting bubble content:', {
+            title: highlight.title,
+            typeName: highlight.typeName,
+            content: highlight.content.substring(0, 100) + '...'
+        });
 
         title.textContent = highlight.title;
         type.textContent = highlight.typeName;
@@ -704,6 +930,8 @@ class BookReader {
 
         overlay.classList.add('show');
         bubble.classList.add('show');
+
+        console.log('✅ Text bubble should now be visible');
 
         // Prevent body scrolling when bubble is open
         document.body.style.overflow = 'hidden';
