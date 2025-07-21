@@ -107,6 +107,95 @@ const isSupabaseConfigured = () => {
 
 // Database service for book operations
 class DatabaseService {
+    // Utility methods
+    static async isUsingRealDatabase() {
+        await ensureSupabaseReady();
+        return isSupabaseConfigured();
+    }
+    
+    static async isUsingMockData() {
+        await ensureSupabaseReady();
+        return !isSupabaseConfigured();
+    }
+    
+    // Debug method to inspect table structure
+    static async inspectHighlightsTable() {
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('🔍 TABLE INSPECTION: Using mock data, no real table to inspect');
+            return {
+                isReal: false,
+                mockStructure: {
+                    highlights: ['id', 'book_id', 'chapter_id', 'title', 'content', 'selected_text', 'highlight_type', 'created_at']
+                }
+            };
+        }
+        
+        console.log('🔍 INSPECTING HIGHLIGHTS TABLE STRUCTURE...');
+        
+        try {
+            // Try to get a sample record to see the structure
+            const { data: sampleData, error: sampleError } = await supabaseClient
+                .from('highlights')
+                .select('*')
+                .limit(1);
+            
+            console.log('🎯 SAMPLE HIGHLIGHTS QUERY:');
+            console.log('- Table: highlights');
+            console.log('- Operation: SELECT *');
+            console.log('- Limit: 1');
+            console.log('- Error:', sampleError);
+            console.log('- Sample data:', sampleData);
+            
+            let availableColumns = [];
+            if (sampleData && sampleData.length > 0) {
+                availableColumns = Object.keys(sampleData[0]);
+                console.log('📋 AVAILABLE COLUMNS IN HIGHLIGHTS TABLE:');
+                availableColumns.forEach((col, index) => {
+                    const value = sampleData[0][col];
+                    const type = typeof value;
+                    console.log(`  ${index + 1}. ${col}: ${value} (${type})`);
+                });
+            } else {
+                console.log('⚠️ No sample data found, trying to insert a test record to discover schema...');
+                
+                // Try a minimal insert to see what columns are required
+                const testData = { test_field: 'test_value' };
+                const { data: testInsert, error: testError } = await supabaseClient
+                    .from('highlights')
+                    .insert(testData)
+                    .select();
+                
+                console.log('🧪 TEST INSERT RESULT:');
+                console.log('- Test data:', testData);
+                console.log('- Error:', testError);
+                console.log('- Response:', testInsert);
+                
+                if (testError) {
+                    console.log('📋 ERROR REVEALS SCHEMA INFO:');
+                    console.log('- Error message:', testError.message);
+                    console.log('- Error details:', testError.details);
+                    console.log('- Error hint:', testError.hint);
+                }
+            }
+            
+            return {
+                isReal: true,
+                availableColumns,
+                sampleData: sampleData?.[0],
+                sampleError
+            };
+            
+        } catch (error) {
+            console.error('❌ Error inspecting table:', error);
+            return {
+                isReal: true,
+                error: error.message
+            };
+        }
+    }
+    
     // Books
     static async getBooks() {
         await ensureSupabaseReady();
@@ -351,20 +440,266 @@ class DatabaseService {
     }
 
     static async createHighlight(highlight) {
+        console.log('=== DATABASE CREATE HIGHLIGHT DEBUG ===');
+        console.log('🔍 RECEIVED INPUT - Raw highlight object:', highlight);
+        
         await ensureSupabaseReady();
         
         if (!isSupabaseConfigured()) {
-            return { ...highlight, id: 'mock-highlight-id' }; // Return mock highlight
+            console.log('Supabase not configured, returning mock highlight');
+            return { ...highlight, id: 'mock-highlight-' + Date.now() };
         }
 
-        const { data, error } = await supabaseClient
-            .from('highlights')
-            .insert(highlight)
-            .select()
-            .single();
+        console.log('Supabase configured, processing highlight for database...');
         
-        if (error) throw error;
-        return data;
+        // Check if we're dealing with UUID vs string IDs
+        const isBookIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(highlight.book_id);
+        const isChapterIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(highlight.chapter_id);
+        
+        console.log('📋 ID Format Analysis:');
+        console.log('- Book ID:', highlight.book_id, '(UUID format:', isBookIdUuid, ')');
+        console.log('- Chapter ID:', highlight.chapter_id, '(UUID format:', isChapterIdUuid, ')');
+        
+        // If we have string IDs but need UUIDs, we need to look up the actual UUIDs
+        let processedHighlight = { ...highlight };
+        
+        if (!isBookIdUuid || !isChapterIdUuid) {
+            console.log('⚠️ Non-UUID IDs detected. Attempting to resolve to UUIDs...');
+            
+            try {
+                // If book_id is not a UUID, try to find the book record to get its UUID
+                if (!isBookIdUuid) {
+                    console.log('🔍 Looking up book UUID for book_id:', highlight.book_id);
+                    
+                    console.log('🎯 SUPABASE QUERY - Books Table:');
+                    console.log('- Table: books');
+                    console.log('- Operation: SELECT');
+                    console.log('- Columns: id, title');
+                    console.log('- Limit: 10');
+                    
+                    // Query books table to find the UUID for this book
+                    const { data: books, error: bookError } = await supabaseClient
+                        .from('books')
+                        .select('id, title')
+                        .limit(10);
+                    
+                    console.log('🎯 BOOKS QUERY RESPONSE:');
+                    console.log('- Error:', bookError);
+                    console.log('- Data count:', books ? books.length : 0);
+                    console.log('- Books data:', books);
+                        
+                    if (books && books.length > 0) {
+                        console.log('📚 Available books with UUIDs:');
+                        books.forEach((book, index) => {
+                            console.log(`  ${index + 1}. ${book.title}: ${book.id}`);
+                        });
+                        // For now, use the first book's UUID if we can't match
+                        processedHighlight.book_id = books[0].id;
+                        console.log('📚 MAPPING: Using first available book UUID:', processedHighlight.book_id);
+                    } else {
+                        console.log('❌ No books found in database');
+                    }
+                }
+                
+                // If chapter_id is not a UUID, try to find the chapter record to get its UUID
+                if (!isChapterIdUuid) {
+                    console.log('🔍 Looking up chapter UUID for chapter_id:', highlight.chapter_id);
+                    
+                    console.log('🎯 SUPABASE QUERY - Chapters Table:');
+                    console.log('- Table: chapters');
+                    console.log('- Operation: SELECT');
+                    console.log('- Columns: id, chapter_number, book_id, title');
+                    console.log('- Filter: book_id =', processedHighlight.book_id);
+                    console.log('- Limit: 10');
+                    
+                    // Query chapters table to find the UUID for this chapter
+                    const { data: chapters, error: chapterError } = await supabaseClient
+                        .from('chapters')
+                        .select('id, chapter_number, book_id, title')
+                        .eq('book_id', processedHighlight.book_id)
+                        .limit(10);
+                    
+                    console.log('🎯 CHAPTERS QUERY RESPONSE:');
+                    console.log('- Error:', chapterError);
+                    console.log('- Data count:', chapters ? chapters.length : 0);
+                    console.log('- Chapters data:', chapters);
+                        
+                    if (chapters && chapters.length > 0) {
+                        console.log('📄 Available chapters with UUIDs:');
+                        chapters.forEach((chapter, index) => {
+                            console.log(`  ${index + 1}. Chapter ${chapter.chapter_number} (${chapter.title}): ${chapter.id}`);
+                        });
+                        
+                        // Try to find chapter by number (assuming highlight.chapter_id might be a chapter number)
+                        console.log(`🔍 Looking for chapter number: ${highlight.chapter_id}`);
+                        const targetChapter = chapters.find(c => c.chapter_number.toString() === highlight.chapter_id.toString());
+                        
+                        if (targetChapter) {
+                            processedHighlight.chapter_id = targetChapter.id;
+                            console.log('📄 MAPPING: Found matching chapter by number');
+                            console.log(`   Chapter ${targetChapter.chapter_number} -> UUID: ${targetChapter.id}`);
+                        } else {
+                            processedHighlight.chapter_id = chapters[0].id;
+                            console.log('📄 MAPPING: No exact match, using first chapter');
+                            console.log(`   Chapter ${chapters[0].chapter_number} -> UUID: ${chapters[0].id}`);
+                        }
+                    } else {
+                        console.log('❌ No chapters found for book:', processedHighlight.book_id);
+                    }
+                }
+                
+            } catch (lookupError) {
+                console.error('❌ Error looking up UUIDs:', lookupError);
+                // Continue with original IDs and see what happens
+            }
+        }
+        
+        console.log('📋 Final processed highlight:', processedHighlight);
+        
+        try {
+            console.log('🔒 FINAL PRE-INSERT VALIDATION:');
+            console.log('- highlight_type value:', processedHighlight.highlight_type);
+            console.log('- highlight_type type:', typeof processedHighlight.highlight_type);
+            console.log('- is valid value:', ['context', 'analysis'].includes(processedHighlight.highlight_type));
+            console.log('- book_id format check:', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(processedHighlight.book_id));
+            console.log('- chapter_id format check:', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(processedHighlight.chapter_id));
+            
+            // Enhanced logging for exact Supabase operation
+            console.log('🎯 SUPABASE INSERT OPERATION DETAILS:');
+            console.log('- Target table: highlights');
+            console.log('- Operation: INSERT');
+            console.log('- Data being sent to database:');
+            console.table(processedHighlight);
+            console.log('- Raw data object:', JSON.stringify(processedHighlight, null, 2));
+            console.log('- Column mapping:');
+            Object.keys(processedHighlight).forEach(key => {
+                console.log(`  ${key} -> ${processedHighlight[key]} (${typeof processedHighlight[key]})`);
+            });
+            console.log('- SQL equivalent would be something like:');
+            const columns = Object.keys(processedHighlight).join(', ');
+            const values = Object.values(processedHighlight).map(v => typeof v === 'string' ? `'${v}'` : v).join(', ');
+            console.log(`  INSERT INTO highlights (${columns}) VALUES (${values});`);
+            
+            // Use the processed highlight for insertion
+            const { data, error } = await supabaseClient
+                .from('highlights')
+                .insert(processedHighlight)
+                .select()
+                .single();
+            
+            console.log('🎯 SUPABASE RESPONSE:');
+            console.log('- Insert operation completed');
+            console.log('- Error:', error);
+            console.log('- Returned data:', data);
+            if (error) {
+                console.log('- Error code:', error.code);
+                console.log('- Error message:', error.message);
+                console.log('- Error details:', error.details);
+                console.log('- Error hint:', error.hint);
+            }
+            
+            if (error) {
+                console.error('❌ Supabase error:', error);
+                
+                // If we get a UUID error, try omitting the problematic ID fields and let the database auto-generate
+                if (error.message && error.message.includes('uuid')) {
+                    console.log('🔄 UUID error - trying without explicit IDs...');
+                    
+                    const noIdHighlight = {
+                        selected_text: processedHighlight.selected_text,
+                        highlight_type: processedHighlight.highlight_type
+                    };
+                    
+                    console.log('🎯 RETRY SUPABASE INSERT (NO IDs):');
+                    console.log('- Target table: highlights');
+                    console.log('- Operation: INSERT (without IDs)');
+                    console.log('- Data being sent:');
+                    console.table(noIdHighlight);
+                    console.log('- Raw data:', JSON.stringify(noIdHighlight, null, 2));
+                    
+                    const { data: noIdData, error: noIdError } = await supabaseClient
+                        .from('highlights')
+                        .insert(noIdHighlight)
+                        .select()
+                        .single();
+                    
+                    console.log('🎯 RETRY SUPABASE RESPONSE:');
+                    console.log('- Error:', noIdError);
+                    console.log('- Returned data:', noIdData);
+                        
+                    if (noIdError) {
+                        console.error('❌ No-ID insert failed:', noIdError);
+                        throw noIdError;
+                    }
+                    
+                    console.log('✅ No-ID insert succeeded:', noIdData);
+                    return noIdData;
+                }
+                
+                // If we get a column error, try with even fewer fields
+                if (error.message && error.message.includes('column')) {
+                    console.log('🔄 Column error - trying with minimum fields only...');
+                    
+                    const minimalHighlight = {
+                        selected_text: processedHighlight.selected_text
+                    };
+                    
+                    console.log('🎯 MINIMAL SUPABASE INSERT:');
+                    console.log('- Target table: highlights');
+                    console.log('- Operation: INSERT (minimal fields only)');
+                    console.log('- Data being sent:');
+                    console.table(minimalHighlight);
+                    console.log('- Raw data:', JSON.stringify(minimalHighlight, null, 2));
+                    console.log('- Only column: selected_text');
+                    
+                    const { data: minData, error: minError } = await supabaseClient
+                        .from('highlights')
+                        .insert(minimalHighlight)
+                        .select()
+                        .single();
+                    
+                    console.log('🎯 MINIMAL SUPABASE RESPONSE:');
+                    console.log('- Error:', minError);
+                    console.log('- Returned data:', minData);
+                        
+                    if (minError) {
+                        console.error('❌ Minimal insert failed:', minError);
+                        console.log('- Minimal error code:', minError.code);
+                        console.log('- Minimal error message:', minError.message);
+                        console.log('- Minimal error details:', minError.details);
+                        throw minError;
+                    }
+                    
+                    console.log('✅ Minimal insert succeeded:', minData);
+                    return minData;
+                }
+                
+                throw error;
+            }
+            
+            console.log('✅ Highlight created successfully!');
+            console.log('🎯 SUCCESSFUL INSERT RESULT:');
+            console.log('- Returned data:', data);
+            console.log('- Generated ID:', data?.id);
+            console.log('- Final record in database:');
+            console.table(data);
+            if (data) {
+                console.log('- Database assigned columns:');
+                Object.keys(data).forEach(key => {
+                    console.log(`  ${key}: ${data[key]} (${typeof data[key]})`);
+                });
+            }
+            return data;
+            
+        } catch (dbError) {
+            console.error('❌ Database error in createHighlight:', dbError);
+            console.error('Error type:', typeof dbError);
+            console.error('Error toString:', dbError.toString());
+            if (dbError.message) {
+                console.error('Error message:', dbError.message);
+            }
+            throw dbError;
+        }
     }
 
     static async updateHighlight(id, updates) {

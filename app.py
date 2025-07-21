@@ -147,13 +147,28 @@ def ask_aristo():
             
             ai_response = response.choices[0].message.content.strip()
             
+            print(f"=== ARISTO RESPONSE PARSING DEBUG ===")
+            print(f"Raw AI response: {ai_response}")
+            print(f"Response length: {len(ai_response)}")
+            print(f"Response type: {type(ai_response)}")
+            
             # Parse the JSON array response from Aristo
             try:
                 parsed_response = json.loads(ai_response)
+                print(f"Parsed response: {parsed_response}")
+                print(f"Parsed response type: {type(parsed_response)}")
+                print(f"Is list: {isinstance(parsed_response, list)}")
+                print(f"List length: {len(parsed_response) if isinstance(parsed_response, list) else 'N/A'}")
+                
                 if isinstance(parsed_response, list) and len(parsed_response) >= 2:
                     # Extract the answer (first item) and label (second item)
                     answer = parsed_response[0]
                     label = parsed_response[1]
+                    
+                    print(f"Extracted answer: {answer}")
+                    print(f"Extracted label: {label}")
+                    print(f"Label type: {type(label)}")
+                    print(f"Label is valid: {label in ['context', 'analysis']}")
                     
                     return jsonify({
                         'success': True,
@@ -162,19 +177,23 @@ def ask_aristo():
                         'user_input': user_input
                     })
                 else:
+                    print(f"❌ Response not in expected format")
                     # Fallback if response isn't in expected format
                     return jsonify({
                         'success': True,
                         'response': ai_response,
                         'user_input': user_input,
+                        'label': 'analysis',  # Provide default label
                         'note': 'Response not in expected JSON array format'
                     })
             except json.JSONDecodeError:
+                print(f"❌ JSON decode error")
                 # Fallback if response isn't valid JSON
                 return jsonify({
                     'success': True,
                     'response': ai_response,
                     'user_input': user_input,
+                    'label': 'analysis',  # Provide default label
                     'note': 'Response not in JSON format'
                 })
             
@@ -199,6 +218,7 @@ Please check your OpenAI API configuration and try again for more personalized a
                 'success': True,
                 'response': fallback_response,
                 'user_input': user_input,
+                'label': 'analysis',  # Provide default label for fallback
                 'fallback': True
             })
             
@@ -213,6 +233,192 @@ def test_supabase():
 @app.route('/test_frontend.html')
 def test_frontend():
     return render_template('test_frontend.html')
+
+@app.route('/api/find-relevant-text', methods=['POST'])
+def find_relevant_text():
+    """Find the most relevant text snippet from chapter content using AI"""
+    print("=== FIND RELEVANT TEXT API CALLED ===")
+    try:
+        data = request.get_json()
+        print(f"Received data keys: {list(data.keys()) if data else 'None'}")
+        
+        user_question = data.get('userQuestion', '').strip()
+        aristo_response = data.get('aristoResponse', '').strip()
+        chapter_content = data.get('chapterContent', '').strip()
+        
+        print(f"User question length: {len(user_question)}")
+        print(f"Aristo response length: {len(aristo_response)}")
+        print(f"Chapter content length: {len(chapter_content)}")
+        
+        if not all([user_question, aristo_response, chapter_content]):
+            print("ERROR: Missing required data")
+            return jsonify({'error': 'Missing required data'}), 400
+        
+        # Prepare the prompt for text selection
+        selection_prompt = f"""You are helping to identify the most relevant text snippet from a chapter that relates to a user's question and an AI assistant's response.
+
+USER'S QUESTION: {user_question}
+
+AI ASSISTANT'S RESPONSE: {aristo_response}
+
+CHAPTER CONTENT:
+{chapter_content}
+
+Your task is to find the most relevant text snippet from the chapter content that directly relates to both the user's question and the AI assistant's response. This text will be highlighted to show the connection.
+
+Rules:
+1. Select a continuous text snippet (not multiple separate pieces)
+2. The snippet should be between 10-200 words
+3. It should be the EXACT text as it appears in the chapter (maintain exact spelling, punctuation, and capitalization)
+4. Choose text that most directly relates to what the user asked about and what the AI responded about
+5. If multiple snippets are relevant, choose the most significant one
+6. Respond with ONLY the selected text snippet, no additional commentary or quotation marks
+
+Selected text snippet:"""
+
+        try:
+            print("Calling OpenAI API for text selection...")
+            # Call OpenAI API for text selection
+            response = openai_client.chat.completions.create(
+                model=os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo'),
+                messages=[
+                    {
+                        'role': 'user',
+                        'content': selection_prompt
+                    }
+                ],
+                max_tokens=int(os.getenv('OPENAI_MAX_TOKENS', '300')),
+                temperature=0.3  # Lower temperature for more precise selection
+            )
+            
+            selected_text = response.choices[0].message.content.strip()
+            print(f"OpenAI selected text length: {len(selected_text)}")
+            print(f"Selected text preview: {selected_text[:100]}...")
+            
+            # Validate that the selected text exists in the chapter content
+            if selected_text in chapter_content:
+                print("✅ Selected text found in chapter content")
+                return jsonify({
+                    'success': True,
+                    'selectedText': selected_text
+                })
+            else:
+                print("⚠️ Selected text not found exactly, trying fuzzy matching...")
+                # Try to find a close match (in case of minor formatting differences)
+                import difflib
+                
+                # Split chapter into sentences/phrases for fuzzy matching
+                chapter_sentences = []
+                for paragraph in chapter_content.split('\n\n'):
+                    sentences = paragraph.split('. ')
+                    chapter_sentences.extend(sentences)
+                
+                print(f"Split chapter into {len(chapter_sentences)} sentences")
+                
+                # Find best match
+                best_match = difflib.get_close_matches(
+                    selected_text, 
+                    chapter_sentences, 
+                    n=1, 
+                    cutoff=0.6
+                )
+                
+                if best_match:
+                    print(f"✅ Found fuzzy match: {best_match[0][:100]}...")
+                    return jsonify({
+                        'success': True,
+                        'selectedText': best_match[0].strip()
+                    })
+                else:
+                    print("❌ No fuzzy match found")
+                    return jsonify({
+                        'success': False,
+                        'error': 'AI selected text not found in chapter content'
+                    })
+            
+        except Exception as openai_error:
+            print(f"❌ OpenAI API Error in text selection: {openai_error}")
+            
+            # Fallback: Use simple keyword matching
+            print("Trying fallback keyword matching...")
+            fallback_text = find_fallback_relevant_text(user_question, chapter_content)
+            
+            if fallback_text:
+                print(f"✅ Fallback found text: {fallback_text[:100]}...")
+                return jsonify({
+                    'success': True,
+                    'selectedText': fallback_text,
+                    'fallback': True
+                })
+            else:
+                print("❌ Fallback also failed")
+                return jsonify({
+                    'success': False,
+                    'error': 'Could not find relevant text with AI or fallback method'
+                })
+            
+    except Exception as e:
+        print(f"❌ Server Error in find_relevant_text: {e}")
+        print(f"Error details: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+def find_fallback_relevant_text(user_question, chapter_content):
+    """Fallback method to find relevant text using keyword matching"""
+    print("=== FALLBACK TEXT SELECTION START ===")
+    try:
+        import re
+        
+        # Extract key words from the user question (remove common words)
+        common_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'what', 'how', 'why', 'when', 'where', 'who', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'can', 'may', 'might', 'this', 'that', 'these', 'those'}
+        
+        question_words = [word.lower().strip('.,!?;:') for word in user_question.split() if word.lower() not in common_words and len(word) > 2]
+        print(f"Extracted keywords: {question_words}")
+        
+        if not question_words:
+            print("No keywords extracted from question")
+            return None
+        
+        # Split chapter into sentences
+        sentences = []
+        for paragraph in chapter_content.split('\n\n'):
+            para_sentences = re.split(r'[.!?]+', paragraph)
+            sentences.extend([s.strip() for s in para_sentences if s.strip()])
+        
+        print(f"Split chapter into {len(sentences)} sentences")
+        
+        # Score sentences based on keyword matches
+        best_sentence = ""
+        best_score = 0
+        
+        for i, sentence in enumerate(sentences):
+            if len(sentence) < 20:  # Skip very short sentences
+                continue
+                
+            score = 0
+            sentence_lower = sentence.lower()
+            
+            matched_words = []
+            for word in question_words:
+                if word in sentence_lower:
+                    score += 1
+                    matched_words.append(word)
+            
+            # Bonus for longer, more complete sentences
+            if len(sentence) > 50:
+                score += 0.5
+            
+            if score > best_score and score > 0:
+                best_score = score
+                best_sentence = sentence
+                print(f"New best sentence (score {score}): {sentence[:100]}... (matched: {matched_words})")
+        
+        print(f"Final best sentence score: {best_score}")
+        print("=== FALLBACK TEXT SELECTION END ===")
+        return best_sentence if best_sentence else None
+        
+    except Exception as e:
+        print(f"❌ Error in fallback text selection: {e}")
+        return None
 
 @app.route('/api/debug')
 def debug_info():

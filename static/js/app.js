@@ -310,6 +310,10 @@ class BookReader {
             this.submitAristoQuery();
         });
 
+        document.getElementById('aristoSaveHighlightBtn').addEventListener('click', () => {
+            this.saveAristoResponseAsHighlight();
+        });
+
         // Enter key in Aristo textarea
         document.getElementById('aristoTextarea').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -484,9 +488,25 @@ class BookReader {
 
     getTypeDisplayName(type) {
         switch(type) {
-            case 'aristo-context': return 'Context from Aristo';
-            case 'aristo-analysis': return 'Analysis from Aristo';
-            default: return 'Unknown';
+            case 'aristo-context':
+            case 'context':
+                return 'Context from Aristo';
+            case 'aristo-analysis':
+            case 'analysis':
+                return 'Analysis from Aristo';
+            default: 
+                return `Aristo Note (${type || 'unknown'})`;
+        }
+    }
+
+    getHighlightCssClass(type) {
+        switch(type) {
+            case 'context':
+                return 'aristo-context';
+            case 'analysis':
+                return 'aristo-analysis';
+            default:
+                return 'aristo-context'; // fallback
         }
     }
 
@@ -555,17 +575,18 @@ class BookReader {
                 // Single highlight
                 const { term, type, data } = highlightData[0];
                 const title = data.title || 'Highlight';
-                const replacement = `<span class="highlight ${type}" data-highlight="${term}" data-type="${type}" data-title="${title}">${text}</span>`;
+                const cssClass = this.getHighlightCssClass(type);
+                const replacement = `<span class="highlight ${cssClass}" data-highlight="${term}" data-type="${type}" data-title="${title}">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
-                console.log('Applied single highlight:', text, 'with type:', type);
+                console.log('Applied single highlight:', text, 'with type:', type, 'and CSS class:', cssClass);
             } else {
                 // Multiple overlapping highlights
-                const typeClasses = highlightData.map(h => h.type).join(' ');
+                const typeClasses = highlightData.map(h => this.getHighlightCssClass(h.type)).join(' ');
                 const terms = highlightData.map(h => h.term).join('|');
                 const titles = highlightData.map(h => h.data.title || 'Highlight').join(' | ');
                 const replacement = `<span class="highlight highlight-stack ${typeClasses}" data-highlight="${terms}" data-type="multiple" data-title="${titles}">${text}</span>`;
                 formattedContent = formattedContent.substring(0, start) + replacement + formattedContent.substring(end);
-                console.log('Applied multiple highlights:', text, 'with types:', typeClasses);
+                console.log('Applied multiple highlights:', text, 'with CSS classes:', typeClasses);
             }
         });
         
@@ -670,7 +691,7 @@ class BookReader {
 
         title.textContent = highlight.title;
         type.textContent = highlight.typeName;
-        type.className = `text-bubble-type ${highlight.type}`;
+        type.className = `text-bubble-type ${this.getHighlightCssClass(highlight.type)}`;
         content.innerHTML = highlight.content;
 
         overlay.classList.add('show');
@@ -728,9 +749,14 @@ class BookReader {
 
     getTypeColor(type) {
         switch(type) {
-            case 'aristo-context': return '#F44336';
-            case 'aristo-analysis': return '#2196F3';
-            default: return '#666';
+            case 'context':
+            case 'aristo-context': 
+                return '#F44336';
+            case 'analysis':
+            case 'aristo-analysis': 
+                return '#2196F3';
+            default: 
+                return '#666';
         }
     }
 
@@ -1811,10 +1837,16 @@ class BookReader {
         const overlay = document.getElementById('aristoModalOverlay');
         const textarea = document.getElementById('aristoTextarea');
         const responseDiv = document.getElementById('aristoResponse');
+        const responseContent = document.getElementById('aristoResponseContent');
+        const saveHighlightBtn = document.getElementById('aristoSaveHighlightBtn');
         
         // Clear previous content
         textarea.value = '';
         responseDiv.style.display = 'none';
+        saveHighlightBtn.style.display = 'none';
+        
+        // Clear stored label
+        responseContent.dataset.aristoLabel = '';
         
         // Show modal
         overlay.classList.add('show');
@@ -1845,6 +1877,7 @@ class BookReader {
         const submitBtn = document.getElementById('aristoSubmitBtn');
         const responseDiv = document.getElementById('aristoResponse');
         const responseContent = document.getElementById('aristoResponseContent');
+        const saveHighlightBtn = document.getElementById('aristoSaveHighlightBtn');
         const userInput = textarea.value.trim();
         
         if (!userInput) {
@@ -1856,8 +1889,9 @@ class BookReader {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Thinking...';
         
-        // Hide previous response
+        // Hide previous response and save button
         responseDiv.style.display = 'none';
+        saveHighlightBtn.style.display = 'none';
         
         try {
             // Get current chapter content for context
@@ -1887,18 +1921,40 @@ class BookReader {
             
             const data = await response.json();
             
+            console.log('=== ARISTO RESPONSE DEBUG ===');
+            console.log('Full response data:', data);
+            console.log('Response label:', data.label);
+            console.log('Label type:', typeof data.label);
+            console.log('Is label valid?', ['context', 'analysis'].includes(data.label));
+            
             if (data.success) {
                 // Show the response
                 responseContent.textContent = data.response;
                 responseDiv.style.display = 'block';
+                
+                // Store the label for later use when saving highlights
+                const labelToStore = data.label || 'analysis';
+                responseContent.dataset.aristoLabel = labelToStore;
+                
+                console.log('Stored label in dataset:', labelToStore);
+                console.log('Dataset after storing:', responseContent.dataset.aristoLabel);
+                
+                // Show Save Highlight button
+                saveHighlightBtn.style.display = 'inline-block';
                 
                 // Show a subtle indication if it's a fallback response
                 if (data.fallback) {
                     responseContent.style.borderLeft = '3px solid orange';
                     responseContent.title = 'Fallback response - OpenAI API may not be configured';
                 } else {
-                    responseContent.style.borderLeft = '3px solid var(--accent-color)';
-                    responseContent.title = 'AI-powered response from Aristo';
+                    // Set border color based on label
+                    const label = data.label || 'analysis';
+                    if (label === 'context') {
+                        responseContent.style.borderLeft = '3px solid rgba(244, 67, 54, 0.8)'; // Red for context
+                    } else {
+                        responseContent.style.borderLeft = '3px solid rgba(33, 150, 243, 0.8)'; // Blue for analysis
+                    }
+                    responseContent.title = `AI-powered ${label} from Aristo`;
                 }
                 
                 // Scroll response into view
@@ -1915,11 +1971,314 @@ class BookReader {
             responseContent.textContent = `Sorry, I encountered an error while processing your request: ${error.message}`;
             responseContent.style.borderLeft = '3px solid red';
             responseDiv.style.display = 'block';
+            // Don't show save button for error responses
             
         } finally {
             // Re-enable submit button
             submitBtn.disabled = false;
             submitBtn.textContent = 'Ask Aristo';
+        }
+    }
+
+    async saveAristoResponseAsHighlight() {
+        const textarea = document.getElementById('aristoTextarea');
+        const responseContent = document.getElementById('aristoResponseContent');
+        const saveHighlightBtn = document.getElementById('aristoSaveHighlightBtn');
+        
+        const userQuestion = textarea.value.trim();
+        const aristoResponse = responseContent.textContent;
+        
+        console.log('=== SAVE HIGHLIGHT DEBUG START ===');
+        console.log('User question:', userQuestion);
+        console.log('Aristo response:', aristoResponse?.substring(0, 100) + '...');
+        console.log('Current book ID:', this.currentBookId);
+        console.log('Current chapter ID:', this.currentChapterId);
+        
+        // Check if we have the response element and it has been properly initialized
+        if (!responseContent) {
+            console.error('❌ Response content element not found');
+            alert('Error: Could not find response content. Please try asking Aristo again.');
+            return;
+        }
+        
+        // Wait a moment for any pending DOM updates
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (!userQuestion || !aristoResponse) {
+            console.error('Missing question or response');
+            alert('No content to save as highlight.');
+            return;
+        }
+        
+        try {
+            saveHighlightBtn.disabled = true;
+            saveHighlightBtn.textContent = 'Finding relevant text...';
+            
+            // Get current chapter content
+            let chapterContent = '';
+            if (this.currentChapterId && this.book) {
+                const currentChapter = this.book.chapters.find(ch => ch.id === this.currentChapterId);
+                if (currentChapter) {
+                    chapterContent = currentChapter.content;
+                    console.log('Chapter content length:', chapterContent.length);
+                } else {
+                    console.error('Current chapter not found in book');
+                }
+            } else {
+                console.error('Missing chapter ID or book object');
+            }
+            
+            if (!chapterContent) {
+                console.error('No chapter content available');
+                alert('Unable to access chapter content for text selection.');
+                return;
+            }
+            
+            console.log('Calling AI text selection...');
+            // Use AI to find the most relevant text snippet
+            const selectedText = await this.findRelevantTextWithAI(userQuestion, aristoResponse, chapterContent);
+            console.log('AI selected text:', selectedText?.substring(0, 100) + '...');
+            
+            if (!selectedText) {
+                console.error('AI failed to select relevant text');
+                alert('Could not find relevant text in the chapter to highlight. Please try asking a more specific question about the chapter content.');
+                return;
+            }
+            
+            saveHighlightBtn.textContent = 'Saving highlight...';
+            
+            // Get highlight data from stored Aristo response
+            const responseContentElement = document.getElementById('aristoResponseContent');
+            console.log('=== HIGHLIGHT DATA EXTRACTION ===');
+            console.log('Response content element:', responseContentElement);
+            console.log('Dataset object:', responseContentElement.dataset);
+            console.log('All dataset keys:', Object.keys(responseContentElement.dataset));
+            
+            // Extract the label (highlight_type) from the stored dataset
+            const aristoLabel = responseContentElement.dataset.aristoLabel || 'analysis';
+            console.log('Retrieved aristo label:', aristoLabel);
+            
+            // Ensure we have a valid highlight_type value
+            let highlightType;
+            if (aristoLabel === 'context') {
+                highlightType = 'context';
+            } else {
+                highlightType = 'analysis'; // Default fallback
+            }
+            
+            // Get the Aristo response content (this will be the 'content' field)
+            const aristoContent = aristoResponse;
+            
+            console.log('🎯 HIGHLIGHT DATA MAPPING:');
+            console.log('- title: "Aristo Note" (static)');
+            console.log('- content: Aristo response (' + aristoContent.length + ' chars)');
+            console.log('- highlight_type:', highlightType);
+            console.log('- selected_text: Will be AI-selected from chapter');
+            console.log('- book_id: Need UUID from books table');
+            console.log('- chapter_id: Need UUID from chapters table');
+            console.log('=== END HIGHLIGHT DATA EXTRACTION ===');
+            
+            // Calculate position of selected text in the chapter
+            const textContent = document.getElementById('textContent');
+            const plainTextContent = textContent.textContent || textContent.innerText;
+            const positionStart = plainTextContent.indexOf(selectedText);
+            
+            console.log('Plain text content length:', plainTextContent.length);
+            console.log('Position start:', positionStart);
+            
+            if (positionStart === -1) {
+                console.error('Selected text not found in chapter content');
+                console.log('Looking for text:', selectedText.substring(0, 50));
+                console.log('In content starting with:', plainTextContent.substring(0, 200));
+                alert('Selected text could not be located in the chapter. This may be due to formatting differences.');
+                return;
+            }
+            
+            const positionEnd = positionStart + selectedText.length;
+            console.log('Position end:', positionEnd);
+            
+            // Create highlight object with complete field mapping
+            console.log('🎯 CREATING HIGHLIGHT OBJECT WITH COMPLETE MAPPING:');
+            
+            const highlightData = {
+                // Static fields
+                title: 'Aristo Note',
+                content: aristoContent,
+                highlight_type: highlightType,
+                selected_text: selectedText,
+                
+                // ID fields - will be resolved to UUIDs by DatabaseService
+                book_id: this.currentBookId,
+                chapter_id: this.currentChapterId
+            };
+            
+            console.log('🎯 COMPLETE HIGHLIGHT DATA MAPPING:');
+            console.log('- title:', highlightData.title);
+            console.log('- content length:', highlightData.content.length);
+            console.log('- highlight_type:', highlightData.highlight_type);
+            console.log('- selected_text length:', highlightData.selected_text.length);
+            console.log('- book_id (current):', highlightData.book_id, '(type:', typeof highlightData.book_id, ')');
+            console.log('- chapter_id (current):', highlightData.chapter_id, '(type:', typeof highlightData.chapter_id, ')');
+            
+            // Check if IDs are in UUID format
+            const bookIdIsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(this.currentBookId);
+            const chapterIdIsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(this.currentChapterId);
+            console.log('- Book ID is UUID format:', bookIdIsUuid);
+            console.log('- Chapter ID is UUID format:', chapterIdIsUuid);
+            
+            // Check if we're using real database or mock data
+            const isRealDb = await DatabaseService.isUsingRealDatabase();
+            console.log('- Using real database:', isRealDb);
+            
+            // Validate all required fields
+            const requiredFields = ['title', 'content', 'book_id', 'chapter_id', 'selected_text', 'highlight_type'];
+            const missingFields = requiredFields.filter(field => !highlightData[field]);
+            
+            console.log('=== FIELD VALIDATION ===');
+            console.log('Required fields:', requiredFields);
+            console.log('Missing fields:', missingFields);
+            
+            requiredFields.forEach(field => {
+                const value = highlightData[field];
+                console.log(`Field ${field}: "${String(value).substring(0, 50)}${String(value).length > 50 ? '...' : ''}" (type: ${typeof value})`);
+            });
+            
+            if (missingFields.length > 0) {
+                console.error('❌ Missing required fields for highlight:', missingFields);
+                alert(`Cannot save highlight: missing required data (${missingFields.join(', ')})`);
+                return;
+            }
+            
+            // Validate highlight_type specifically
+            const validHighlightTypes = ['context', 'analysis'];
+            if (!validHighlightTypes.includes(highlightData.highlight_type)) {
+                console.error('❌ Invalid highlight_type:', highlightData.highlight_type);
+                highlightData.highlight_type = 'analysis'; // Fallback
+                console.log('✅ Corrected highlight_type to:', highlightData.highlight_type);
+            }
+            
+            console.log('🎯 FINAL HIGHLIGHT DATA FOR DATABASE:');
+            console.log('- Sending to: highlights table');
+            console.log('- Total fields:', Object.keys(highlightData).length);
+            console.log('- Complete object:', highlightData);
+            console.log('- Field breakdown:');
+            Object.entries(highlightData).forEach(([key, value]) => {
+                const preview = String(value).length > 100 ? String(value).substring(0, 100) + '...' : String(value);
+                console.log(`    ${key}: "${preview}" (${typeof value}, ${String(value).length} chars)`);
+            });
+            
+            console.log('Calling DatabaseService.createHighlight...');
+            const savedHighlight = await DatabaseService.createHighlight(highlightData);
+            console.log('Saved highlight result:', savedHighlight);
+            
+            // Add to local cache
+            if (!this.chapterHighlights.has(this.currentChapterId)) {
+                this.chapterHighlights.set(this.currentChapterId, new Map());
+            }
+            
+            const highlightMap = this.chapterHighlights.get(this.currentChapterId);
+            const highlightKey = savedHighlight.selected_text.toLowerCase();
+            
+            highlightMap.set(highlightKey, {
+                id: savedHighlight.id,
+                type: savedHighlight.highlight_type,
+                typeName: this.getTypeDisplayName(savedHighlight.highlight_type),
+                title: savedHighlight.title,
+                content: savedHighlight.content,
+                selectedText: savedHighlight.selected_text
+            });
+            
+            console.log('Added to local cache with key:', highlightKey);
+            console.log('Cache now has', highlightMap.size, 'highlights for this chapter');
+            
+            // Show success message and close modal
+            const successMessage = `Aristo response saved as highlight!\n\nHighlighted text: "${selectedText.substring(0, 100)}${selectedText.length > 100 ? '...' : ''}"\n\nThe highlight will appear when you refresh or navigate back to this chapter.`;
+            console.log('Showing success message');
+            alert(successMessage);
+            this.closeAristoModal();
+            
+            // Refresh highlights display
+            console.log('Refreshing highlights display...');
+            await this.loadChapterHighlights(this.currentChapterId);
+            console.log('=== SAVE HIGHLIGHT DEBUG SUCCESS ===');
+            
+        } catch (error) {
+            console.error('=== SAVE HIGHLIGHT DEBUG ERROR ===');
+            console.error('Error details:', error);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            
+            let errorMessage = 'Failed to save highlight. ';
+            if (error.message) {
+                if (error.message.includes('relation') && error.message.includes('does not exist')) {
+                    errorMessage += 'Database table not found. Please check your database setup.';
+                } else if (error.message.includes('permission denied')) {
+                    errorMessage += 'Permission denied. Please check your database permissions.';
+                } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                    errorMessage += 'Network error. Please check your connection.';
+                } else {
+                    errorMessage += `Details: ${error.message}`;
+                }
+            } else {
+                errorMessage += 'Please check the console for more details.';
+            }
+            
+            alert(errorMessage);
+        } finally {
+            saveHighlightBtn.disabled = false;
+            saveHighlightBtn.textContent = 'Save Highlight';
+            console.log('=== SAVE HIGHLIGHT DEBUG END ===');
+        }
+    }
+
+    async findRelevantTextWithAI(userQuestion, aristoResponse, chapterContent) {
+        console.log('=== AI TEXT SELECTION DEBUG START ===');
+        console.log('Question length:', userQuestion.length);
+        console.log('Response length:', aristoResponse.length);
+        console.log('Chapter content length:', chapterContent.length);
+        
+        try {
+            console.log('Making API call to /api/find-relevant-text...');
+            const response = await fetch('/api/find-relevant-text', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userQuestion,
+                    aristoResponse,
+                    chapterContent
+                })
+            });
+            
+            console.log('API response status:', response.status);
+            console.log('API response ok:', response.ok);
+            
+            if (!response.ok) {
+                console.error('API response not ok:', response.status, response.statusText);
+                return null;
+            }
+            
+            const data = await response.json();
+            console.log('API response data:', data);
+            
+            if (data.success && data.selectedText) {
+                console.log('AI text selection successful');
+                console.log('Selected text length:', data.selectedText.length);
+                console.log('=== AI TEXT SELECTION DEBUG SUCCESS ===');
+                return data.selectedText;
+            } else {
+                console.error('AI text selection failed:', data.error);
+                console.log('=== AI TEXT SELECTION DEBUG FAILED ===');
+                return null;
+            }
+            
+        } catch (error) {
+            console.error('=== AI TEXT SELECTION DEBUG ERROR ===');
+            console.error('Error calling AI text selection API:', error);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            return null;
         }
     }
 

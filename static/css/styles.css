@@ -1239,7 +1239,7 @@ input[type="range"] {
     opacity: 0;
     visibility: hidden;
     transition: all 0.3s ease;
-    backdrop-filter: blur(20px);
+   
     overflow: hidden;
 }
 
@@ -1351,6 +1351,22 @@ input[type="range"] {
     word-wrap: break-word;
 }
 
+.aristo-highlight-instruction {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: rgba(0, 102, 204, 0.1);
+    border-radius: 0.375rem;
+    border: 1px solid rgba(0, 102, 204, 0.2);
+}
+
+.aristo-highlight-instruction p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--text-color);
+    margin: 0;
+    opacity: 0.8;
+}
+
 .aristo-modal-actions {
     display: flex;
     gap: 1rem;
@@ -1393,6 +1409,23 @@ input[type="range"] {
 }
 
 .aristo-btn-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.aristo-btn-save-highlight {
+    background-color: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+.aristo-btn-save-highlight:hover {
+    background-color: #059669;
+    transform: translateY(-1px);
+}
+
+.aristo-btn-save-highlight:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
@@ -1638,7 +1671,8 @@ input[type="range"] {
     }
 
     .aristo-btn-cancel,
-    .aristo-btn-submit {
+    .aristo-btn-submit,
+    .aristo-btn-save-highlight {
         width: 100%;
     }
 }
