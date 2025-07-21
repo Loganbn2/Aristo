@@ -441,8 +441,12 @@ def debug_info():
     })
 
 if __name__ == '__main__':
+    # Use PORT environment variable for Render, fallback to FLASK_PORT for local dev
+    port = int(os.getenv('PORT', os.getenv('FLASK_PORT', '5001')))
+    debug = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
+    
     app.run(
-        debug=os.getenv('FLASK_DEBUG', 'True').lower() == 'true',
-        port=int(os.getenv('FLASK_PORT', '5001')),
+        debug=debug,
+        port=port,
         host='0.0.0.0'  # Allow external connections for deployment
     )
