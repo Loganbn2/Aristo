@@ -102,7 +102,7 @@ body {
 
 /* Progress Bar */
 .progress-container {
-    padding: 0.5rem 2rem;
+    padding: 8px 16px 8px 40px; /* Added 25px to left side */
     background-color: var(--bg-color);
     display: flex;
     align-items: center;
@@ -112,6 +112,7 @@ body {
 .progress-bar {
     flex: 1;
     height: 4px;
+    margin-left: 20px;
     background-color: var(--progress-bg);
     border-radius: 2px;
     overflow: hidden;
@@ -719,6 +720,19 @@ input[type="range"] {
 .aristo-floating-btn:focus {
     outline: 2px solid rgba(0, 102, 204, 0.5);
     outline-offset: 2px;
+}
+
+/* Dark mode styles for floating comment button */
+[data-theme="dark"] .floating-comment-btn {
+    background: white;
+    color: #1a1a1a;
+    border-color: #e0e0e0;
+}
+
+[data-theme="dark"] .floating-comment-btn:hover {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
 }
 
 /* Subtle pulse animation */
@@ -1458,8 +1472,55 @@ input[type="range"] {
     right: -30px;
 }
 
+/* Mobile Settings Button in Menu Panel */
+.mobile-settings-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mobile-settings-btn {
+    display: none; /* Hidden by default on desktop */
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--button-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.mobile-settings-btn:hover {
+    background: var(--button-hover-bg);
+    border-color: var(--accent-color);
+}
+
+.mobile-settings-btn svg {
+    transition: transform 0.2s ease;
+}
+
+.mobile-settings-btn:hover svg {
+    transform: rotate(90deg);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
+    /* Hide header settings button on mobile */
+    #settingsBtn {
+        display: none !important;
+    }
+    
+    /* Show mobile settings button in menu on mobile */
+    .mobile-settings-btn {
+        display: flex !important;
+    }
+
     .reader-header {
         padding: 1rem;
         flex-direction: column;
@@ -1518,14 +1579,37 @@ input[type="range"] {
         font-size: 1.25rem;
     }
     
+    /* Note indicators on mobile */
+    .note-indicator.right {
+        right: 5px !important; /* 5px from right edge of viewport on mobile */
+    }
+    
     .chapter-navigation {
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
         gap: 1rem;
         text-align: center;
+        align-items: center;
+        justify-content: center;
     }
     
     .chapter-title {
+        grid-column: 1 / -1; /* Span both columns */
+        grid-row: 2; /* Move title to second row */
         margin: 0;
+    }
+    
+    .nav-btn:first-of-type {
+        grid-column: 1;
+        grid-row: 1; /* Move buttons to first row */
+        justify-self: center;
+    }
+    
+    .nav-btn:last-of-type {
+        grid-column: 2;
+        grid-row: 1; /* Move buttons to first row */
+        justify-self: center;
     }
     
     .settings-panel,
@@ -1712,5 +1796,12 @@ input[type="range"] {
     .text-bubble-content {
         font-size: 1rem;
         line-height: 1.6;
+    }
+}
+
+/* Hide header settings button on mobile */
+@media (max-width: 768px) {
+    .header-right {
+        display: none;
     }
 }

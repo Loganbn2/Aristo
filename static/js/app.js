@@ -163,6 +163,11 @@ class BookReader {
             this.togglePanel('settingsPanel');
         });
 
+        // Mobile settings button in menu panel
+        document.getElementById('mobileSettingsBtn').addEventListener('click', () => {
+            this.togglePanel('settingsPanel');
+        });
+
         document.getElementById('closeMenu').addEventListener('click', () => {
             this.closePanel('menuPanel');
         });
@@ -219,12 +224,15 @@ class BookReader {
             const settingsPanel = document.getElementById('settingsPanel');
             const menuBtn = document.getElementById('menuBtn');
             const settingsBtn = document.getElementById('settingsBtn');
+            const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
 
             if (!menuPanel.contains(e.target) && !menuBtn.contains(e.target)) {
                 this.closePanel('menuPanel');
             }
 
-            if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) {
+            if (!settingsPanel.contains(e.target) && 
+                !settingsBtn.contains(e.target) && 
+                !mobileSettingsBtn.contains(e.target)) {
                 this.closePanel('settingsPanel');
             }
         });
