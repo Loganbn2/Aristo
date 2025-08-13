@@ -28,6 +28,243 @@
     --progress-bg: #333333;
 }
 
+/* Audiobook Reader Styles */
+.audiobook-panel {
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem;
+    position: sticky;
+    top: 80px;
+    z-index: 100;
+    box-shadow: var(--shadow);
+}
+
+.audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.audio-btn {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.audio-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-color) 85%, black);
+    transform: scale(1.05);
+}
+
+.audio-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.audio-btn.play-btn {
+    width: 56px;
+    height: 56px;
+}
+
+.audio-btn svg {
+    transition: opacity 0.2s ease;
+}
+
+.audio-btn .hidden {
+    display: none;
+}
+
+.audio-progress {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.audio-progress .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--progress-bg);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.audio-progress .progress-fill {
+    height: 100%;
+    background: var(--accent-color);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.progress-info {
+    display: flex;
+    gap: 0.25rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--text-color);
+    opacity: 0.8;
+    min-width: 80px;
+}
+
+/* Generation Status */
+.generation-status {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--hover-color);
+    border-radius: 1rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--text-color);
+}
+
+.generation-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--accent-color);
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Audio Error Styles */
+.audio-error {
+    background: #f8d7da !important;
+    color: #721c24 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 0.25rem !important;
+    margin: 0.5rem 0 !important;
+    font-size: 0.875rem !important;
+    border: 1px solid #f5c6cb;
+}
+
+/* Audio Settings Panel */
+.audio-settings-panel {
+    position: fixed;
+    top: 0;
+    right: -350px;
+    width: 350px;
+    height: 100vh;
+    background: var(--bg-color);
+    border-left: 1px solid var(--border-color);
+    z-index: 1000;
+    transition: right 0.3s ease;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+}
+
+.audio-settings-panel.open {
+    right: 0;
+}
+
+.audio-settings-content {
+    padding: 2rem;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.audio-settings-content h3 {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-color);
+    margin-bottom: 2rem;
+    font-size: 1.25rem;
+}
+
+.voice-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 0.875rem;
+}
+
+.voice-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+
+/* Audio Highlight Effect */
+.audio-highlight {
+    background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+    background-size: 100% 3px;
+    background-repeat: no-repeat;
+    background-position: 0 bottom;
+    animation: audioHighlightPulse 2s ease-in-out infinite;
+    border-radius: 3px;
+    padding: 0.1rem 0.3rem;
+    margin: -0.1rem -0.3rem;
+}
+
+@keyframes audioHighlightPulse {
+    0%, 100% { 
+        background-color: color-mix(in srgb, #84fab0 30%, transparent);
+        transform: scale(1);
+    }
+    50% { 
+        background-color: color-mix(in srgb, #84fab0 50%, transparent);
+        transform: scale(1.02);
+    }
+}
+
+/* Audio Feature Controls */
+.audio-feature-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.audio-feature-controls .setting-btn {
+    flex: 1;
+    min-height: 40px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .audiobook-panel {
+        position: relative;
+        top: 0;
+    }
+    
+    .audio-controls {
+        justify-content: center;
+    }
+    
+    .audio-progress {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .progress-info {
+        justify-content: center;
+        min-width: auto;
+    }
+    
+    .audio-settings-panel {
+        width: 100%;
+        right: -100%;
+    }
+}
+
 /* Reset and Base Styles */
 * {
     margin: 0;

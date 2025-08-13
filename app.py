@@ -83,7 +83,8 @@ def get_config():
             'anonKey': os.getenv('SUPABASE_ANON_KEY')
         },
         'features': {
-            'openai_enabled': openai_enabled
+            'openai_enabled': openai_enabled,
+            'ai_audio_enabled': openai_enabled  # Same as openai_enabled for TTS
         }
     })
 
@@ -420,6 +421,53 @@ def find_fallback_relevant_text(user_question, chapter_content):
         print(f"❌ Error in fallback text selection: {e}")
         return None
 
+@app.route('/api/generate-audio', methods=['POST'])
+def generate_audio():
+    """Generate high-quality audio for text using OpenAI TTS API"""
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        voice = data.get('voice', 'alloy')  # alloy, echo, fable, onyx, nova, shimmer
+        model = data.get('model', 'tts-1')  # tts-1 or tts-1-hd for higher quality
+        
+        if not text:
+            return jsonify({'error': 'No text provided'}), 400
+            
+        if len(text) > 4096:  # OpenAI TTS limit
+            return jsonify({'error': 'Text too long. Maximum 4096 characters.'}), 400
+            
+        print(f"Generating audio for text length: {len(text)} characters with voice: {voice}")
+        
+        # OpenAI TTS API call
+        response = openai_client.audio.speech.create(
+            model=model,
+            voice=voice,
+            input=text,
+            response_format="mp3"
+        )
+        
+        # Convert to base64 for JSON response
+        import base64
+        audio_base64 = base64.b64encode(response.content).decode('utf-8')
+        
+        print(f"Audio generated successfully, size: {len(response.content)} bytes")
+        
+        return jsonify({
+            'success': True,
+            'audio_data': audio_base64,
+            'format': 'mp3',
+            'text_length': len(text),
+            'voice': voice,
+            'model': model
+        })
+        
+    except Exception as e:
+        print(f"Error generating audio: {e}")
+        return jsonify({
+            'error': f'Failed to generate audio: {str(e)}',
+            'fallback_available': True
+        }), 500
+
 @app.route('/api/debug')
 def debug_info():
     """Debug endpoint to check configuration"""
@@ -435,7 +483,8 @@ def debug_info():
                 'anonKey': os.getenv('SUPABASE_ANON_KEY')
             },
             'features': {
-                'openai_enabled': bool(os.getenv('OPENAI_API_KEY') and os.getenv('OPENAI_API_KEY') != 'your-openai-api-key-here')
+                'openai_enabled': bool(os.getenv('OPENAI_API_KEY') and os.getenv('OPENAI_API_KEY') != 'your-openai-api-key-here'),
+                'ai_audio_enabled': bool(os.getenv('OPENAI_API_KEY') and os.getenv('OPENAI_API_KEY') != 'your-openai-api-key-here')
             }
         }
     })

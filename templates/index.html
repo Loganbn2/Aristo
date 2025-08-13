@@ -98,6 +98,15 @@
                     <span id="widthDisplay">700px</span>
                 </div>
 
+                <div class="setting-group">
+                    <label>Audio Features</label>
+                    <div class="audio-feature-controls">
+                        <button id="toggleAudioPanel" class="setting-btn">
+                            <span class="audio-toggle-text">Show Audio Controls</span>
+                        </button>
+                    </div>
+                </div>
+
                 <button id="closeSettings" class="close-btn">Close</button>
             </div>
         </div>
@@ -257,6 +266,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
     <!-- Database Service -->
     <script src="{{ url_for('static', filename='js/database.js') }}"></script>
+    <!-- Audiobook Reader -->
+    <script src="{{ url_for('static', filename='js/audiobook-reader.js') }}"></script>
     <!-- Main Application -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

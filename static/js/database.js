@@ -855,4 +855,245 @@ class DatabaseService {
         
         if (error) throw error;
     }
+
+    // Audio Cache
+    static async getCachedAudio(cacheKey) {
+        console.log('🔍 Checking for cached audio:', cacheKey);
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, no audio cache available');
+            return null;
+        }
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('audio_cache')
+                .select('*')
+                .eq('cache_key', cacheKey)
+                .single();
+            
+            if (error && error.code !== 'PGRST116') {
+                console.error('❌ Error fetching cached audio:', error);
+                return null;
+            }
+            
+            if (data) {
+                console.log('✅ Found cached audio:', {
+                    cache_key: data.cache_key,
+                    voice: data.voice,
+                    model: data.model,
+                    created_at: data.created_at,
+                    audio_size: data.audio_data ? data.audio_data.length : 0
+                });
+                return data;
+            } else {
+                console.log('📭 No cached audio found for key:', cacheKey);
+                return null;
+            }
+        } catch (error) {
+            console.error('❌ Error accessing audio cache:', error);
+            return null;
+        }
+    }
+
+    static async saveCachedAudio(cacheKey, audioData, voice, model, textHash = null) {
+        console.log('💾 Saving audio to cache:', {
+            cache_key: cacheKey,
+            voice: voice,
+            model: model,
+            audio_size: audioData ? audioData.length : 0,
+            text_hash: textHash
+        });
+        
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, cannot save audio cache');
+            return null;
+        }
+
+        try {
+            const cacheRecord = {
+                cache_key: cacheKey,
+                audio_data: audioData,
+                voice: voice,
+                model: model,
+                text_hash: textHash,
+                created_at: new Date().toISOString()
+            };
+
+            const { data, error } = await supabaseClient
+                .from('audio_cache')
+                .upsert(cacheRecord, {
+                    onConflict: 'cache_key'
+                })
+                .select()
+                .single();
+            
+            if (error) {
+                console.error('❌ Error saving audio cache:', error);
+                return null;
+            }
+            
+            console.log('✅ Audio cached successfully:', {
+                id: data.id,
+                cache_key: data.cache_key,
+                voice: data.voice,
+                model: data.model,
+                created_at: data.created_at
+            });
+            
+            return data;
+        } catch (error) {
+            console.error('❌ Error saving to audio cache:', error);
+            return null;
+        }
+    }
+
+    static async clearAudioCache(cacheKeyPattern = null) {
+        console.log('🗑️ Clearing audio cache:', cacheKeyPattern ? `pattern: ${cacheKeyPattern}` : 'all entries');
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, cannot clear audio cache');
+            return { cleared: 0 };
+        }
+
+        try {
+            let query = supabaseClient.from('audio_cache');
+            
+            if (cacheKeyPattern) {
+                // Clear entries matching a pattern (e.g., specific chapter or book)
+                query = query.delete().ilike('cache_key', `${cacheKeyPattern}%`);
+            } else {
+                // Clear all cache entries
+                query = query.delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all except impossible UUID
+            }
+            
+            const { data, error } = await query;
+            
+            if (error) {
+                console.error('❌ Error clearing audio cache:', error);
+                return { cleared: 0, error: error.message };
+            }
+            
+            const clearedCount = Array.isArray(data) ? data.length : 0;
+            console.log(`✅ Cleared ${clearedCount} audio cache entries`);
+            
+            return { cleared: clearedCount };
+        } catch (error) {
+            console.error('❌ Error clearing audio cache:', error);
+            return { cleared: 0, error: error.message };
+        }
+    }
+
+    static async getAudioCacheStats() {
+        console.log('📊 Getting audio cache statistics');
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            return { total: 0, size: 0, oldest: null, newest: null };
+        }
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('audio_cache')
+                .select('id, cache_key, voice, model, created_at, audio_data')
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                console.error('❌ Error getting cache stats:', error);
+                return { total: 0, size: 0, oldest: null, newest: null, error: error.message };
+            }
+            
+            const stats = {
+                total: data.length,
+                size: data.reduce((sum, item) => sum + (item.audio_data ? item.audio_data.length : 0), 0),
+                oldest: data.length > 0 ? data[data.length - 1].created_at : null,
+                newest: data.length > 0 ? data[0].created_at : null,
+                voices: [...new Set(data.map(item => item.voice))],
+                models: [...new Set(data.map(item => item.model))]
+            };
+            
+            console.log('📊 Audio cache stats:', stats);
+            return stats;
+        } catch (error) {
+            console.error('❌ Error getting cache stats:', error);
+            return { total: 0, size: 0, oldest: null, newest: null, error: error.message };
+        }
+    }
+
+    // New methods for chapter-based audio storage
+    static async saveChapterAudio(chapterId, audioData, voice, model) {
+        console.log('💾 Saving chapter audio:', chapterId);
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, cannot save chapter audio');
+            return false;
+        }
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('chapters')
+                .update({
+                    audio_data: audioData,
+                    audio_voice: voice,
+                    audio_model: model,
+                    audio_generated_at: new Date().toISOString()
+                })
+                .eq('id', chapterId);
+
+            if (error) {
+                console.error('❌ Error saving chapter audio:', error);
+                return false;
+            }
+
+            console.log('✅ Chapter audio saved successfully');
+            return true;
+        } catch (error) {
+            console.error('❌ Error saving chapter audio:', error);
+            return false;
+        }
+    }
+
+    static async getChapterAudio(chapterId, requiredVoice, requiredModel) {
+        console.log('🔍 Getting chapter audio:', chapterId, requiredVoice, requiredModel);
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, no chapter audio available');
+            return null;
+        }
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('chapters')
+                .select('audio_data, audio_voice, audio_model, audio_generated_at')
+                .eq('id', chapterId)
+                .single();
+            
+            if (error && error.code !== 'PGRST116') {
+                console.error('❌ Error fetching chapter audio:', error);
+                return null;
+            }
+            
+            if (data && data.audio_data && data.audio_voice === requiredVoice && data.audio_model === requiredModel) {
+                console.log('✅ Found matching chapter audio:', {
+                    voice: data.audio_voice,
+                    model: data.audio_model,
+                    generated_at: data.audio_generated_at,
+                    audio_size: data.audio_data ? data.audio_data.length : 0
+                });
+                return data;
+            } else {
+                console.log('📭 No matching chapter audio found - voice/model mismatch or no audio');
+                return null;
+            }
+        } catch (error) {
+            console.error('❌ Error accessing chapter audio:', error);
+            return null;
+        }
+    }
 }

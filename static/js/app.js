@@ -8,6 +8,7 @@ class BookReader {
         this.book = null;
         this.chapterHighlights = new Map(); // Cache highlights per chapter
         this.chapterNotes = new Map(); // Cache notes per chapter
+        this.audiobookReader = null; // Initialize audiobook reader
         this.settings = {
             fontSize: 18,
             lineHeight: 1.6,
@@ -27,6 +28,14 @@ class BookReader {
         await this.loadAvailableBooks();
         this.setupEventListeners();
         this.loadSettings();
+        
+        // Initialize audiobook reader if available
+        if (typeof AudiobookReader !== 'undefined') {
+            this.audiobookReader = new AudiobookReader(this);
+            // Make it globally accessible for debugging
+            window.audiobookReader = this.audiobookReader;
+            console.log('Audiobook reader initialized');
+        }
         
         // Load the first book or last read book
         const lastBookId = localStorage.getItem('aristoLastBook');
@@ -216,6 +225,11 @@ class BookReader {
         // Width slider
         document.getElementById('widthSlider').addEventListener('input', (e) => {
             this.changeWidth(e.target.value);
+        });
+
+        // Audio panel toggle
+        document.getElementById('toggleAudioPanel').addEventListener('click', () => {
+            this.toggleAudioPanel();
         });
 
         // Close panels when clicking outside
@@ -461,6 +475,16 @@ class BookReader {
             
             // Update TOC active state
             this.updateTOCActiveState();
+            
+            // Dispatch custom event for audiobook reader
+            const chapterLoadedEvent = new CustomEvent('chapterLoaded', {
+                detail: {
+                    chapterId: chapter.id,
+                    chapterNumber: chapterNumber,
+                    content: chapter.content
+                }
+            });
+            document.dispatchEvent(chapterLoadedEvent);
             
         } catch (error) {
             console.error('Error loading chapter:', error);
@@ -1137,6 +1161,21 @@ class BookReader {
 
     saveSettings() {
         localStorage.setItem('aristoReaderSettings', JSON.stringify(this.settings));
+    }
+
+    toggleAudioPanel() {
+        const audiobookPanel = document.getElementById('audiobookPanel');
+        const toggleButton = document.getElementById('toggleAudioPanel');
+        const toggleText = toggleButton.querySelector('.audio-toggle-text');
+        
+        if (audiobookPanel) {
+            const isHidden = audiobookPanel.style.display === 'none';
+            audiobookPanel.style.display = isHidden ? 'block' : 'none';
+            toggleText.textContent = isHidden ? 'Hide Audio Controls' : 'Show Audio Controls';
+            
+            // Save preference
+            localStorage.setItem('aristoAudioPanelVisible', isHidden ? 'true' : 'false');
+        }
     }
 
     async switchBook(bookId) {
