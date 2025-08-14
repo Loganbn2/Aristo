@@ -1,0 +1,148 @@
+/* Audio UI Styling for Notes and Highlights */
+
+/* Audio button containers */
+.audio-button-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Base audio button styling */
+.audio-highlight-btn,
+.audio-note-btn,
+.audio-note-modal-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 120px;
+    justify-content: center;
+}
+
+/* Specific button colors */
+.audio-highlight-btn {
+    background: var(--accent-color);
+    color: white;
+}
+
+.audio-highlight-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3);
+}
+
+.audio-note-btn {
+    background: #4CAF50;
+    color: white;
+}
+
+.audio-note-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+.audio-note-modal-btn {
+    background: #4CAF50 !important;
+    color: white !important;
+    border-color: #4CAF50 !important;
+}
+
+.audio-note-modal-btn:hover {
+    background: #45a049 !important;
+    transform: translateY(-1px);
+}
+
+/* Loading indicator styling */
+.audio-loading-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-color);
+    opacity: 0.7;
+}
+
+/* Disabled state */
+.audio-highlight-btn:disabled,
+.audio-note-btn:disabled,
+.audio-note-modal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* SVG icon animations */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Ensure buttons look good in the text bubble */
+.text-bubble-content .audio-button-container {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure audio buttons work well in dark mode */
+[data-theme="dark"] .audio-highlight-btn {
+    background: #0066cc;
+}
+
+[data-theme="dark"] .audio-note-btn {
+    background: #4CAF50;
+}
+
+[data-theme="dark"] .audio-loading-indicator {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+    .audio-button-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    
+    .audio-highlight-btn,
+    .audio-note-btn,
+    .audio-note-modal-btn {
+        width: 100%;
+        min-width: auto;
+    }
+}
+
+/* Button text animation */
+.btn-text {
+    transition: opacity 0.2s ease;
+}
+
+/* Improve button visibility in different contexts */
+.note-modal .audio-note-modal-btn {
+    flex-shrink: 0;
+}
+
+/* Add subtle animation when buttons appear */
+.audio-button-container {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

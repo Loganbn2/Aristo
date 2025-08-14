@@ -1,38 +1,39 @@
-// Quick test to check database configuration and ID types
-// Run this in browser console after the app loads
 
-async function quickDebugTest() {
-    console.log('=== QUICK DEBUG TEST ===');
-    
+// Quick test to check audio caching for notes
+console.log('🔍 Testing note audio caching behavior');
+
+// Simulate the debug scenario
+(async function testNoteAudio() {
     try {
-        // Check database configuration
-        const isReal = await DatabaseService.isUsingRealDatabase();
-        const isMock = await DatabaseService.isUsingMockData();
-        console.log('Database status:');
-        console.log('- Using real database:', isReal);
-        console.log('- Using mock data:', isMock);
+        console.log('Testing note audio generation and caching...');
         
-        // Check current app state
-        if (window.bookReader) {
-            console.log('App state:');
-            console.log('- Current book ID:', window.bookReader.currentBookId);
-            console.log('- Current chapter ID:', window.bookReader.currentChapterId);
-            console.log('- Book loaded:', !!window.bookReader.book);
+        // Check if DatabaseService is available
+        if (typeof DatabaseService === 'undefined') {
+            console.error('❌ DatabaseService not found!');
+            return;
         }
         
-        // Get sample data to check ID formats
-        const books = await DatabaseService.getBooks();
-        console.log('Sample books:', books.slice(0, 2));
+        // Test a sample note ID and content
+        const testNoteId = 'test-note-123';
+        const testContent = 'This is a test note for audio caching';
         
-        if (books.length > 0) {
-            const chapter = await DatabaseService.getChapterByNumber(books[0].id, 1);
-            console.log('Sample chapter:', chapter);
+        console.log('📝 Test note:', testNoteId, testContent);
+        
+        // Check if we can query for existing audio
+        console.log('🔍 Checking for existing audio...');
+        const existingAudio = await DatabaseService.getNoteAudio(testNoteId, 'alloy', 'tts-1');
+        console.log('🔍 Existing audio result:', existingAudio);
+        
+        if (existingAudio) {
+            console.log('✅ Found existing audio, should not regenerate');
+        } else {
+            console.log('📭 No existing audio found, would generate new');
         }
+        
+        console.log('✅ Test completed successfully');
         
     } catch (error) {
-        console.error('Error in debug test:', error);
+        console.error('❌ Test error:', error);
     }
-}
-
-// Run immediately
-quickDebugTest();
+})();
+    

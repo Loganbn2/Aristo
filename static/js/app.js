@@ -952,6 +952,21 @@ class BookReader {
         type.className = `text-bubble-type ${this.getHighlightCssClass(highlight.type)}`;
         content.innerHTML = highlight.content;
 
+        // Add audio functionality for highlights
+        setTimeout(async () => {
+            if (typeof window.AudioUIHelper !== 'undefined' && highlight.id) {
+                // Use the highlight content for audio generation
+                const audioContent = highlight.content || highlight.selectedText || '';
+                if (audioContent.trim()) {
+                    await window.AudioUIHelper.addHighlightAudioButton(
+                        highlight.id,
+                        audioContent,
+                        content
+                    );
+                }
+            }
+        }, 100);
+
         overlay.classList.add('show');
         bubble.classList.add('show');
 
@@ -1026,6 +1041,11 @@ class BookReader {
 
         overlay.classList.remove('show');
         bubble.classList.remove('show');
+
+        // Stop any audio playback when closing highlights
+        if (typeof window.AudioUIHelper !== 'undefined') {
+            window.AudioUIHelper.stopAllAudio();
+        }
 
         // Re-enable body scrolling
         document.body.style.overflow = 'auto';
@@ -1466,11 +1486,18 @@ class BookReader {
             modal.classList.add('show');
             console.log('Modal classes added, should be visible now');
             
+            // Add audio button to the modal
+            setTimeout(() => {
+                if (typeof window.AudioUIHelper !== 'undefined') {
+                    window.AudioUIHelper.addNoteModalAudioButton(modal);
+                }
+            }, 100);
+            
             // Focus on the textarea
             setTimeout(() => {
                 textarea.focus();
                 console.log('Textarea focused');
-            }, 100);
+            }, 200);
             
             // Prevent body scrolling
             document.body.style.overflow = 'hidden';
@@ -1487,6 +1514,11 @@ class BookReader {
         
         overlay.classList.remove('show');
         modal.classList.remove('show');
+        
+        // Stop any audio playback when closing notes
+        if (typeof window.AudioUIHelper !== 'undefined') {
+            window.AudioUIHelper.stopAllAudio();
+        }
         
         // Re-enable body scrolling
         document.body.style.overflow = 'auto';
@@ -1791,6 +1823,21 @@ class BookReader {
                 Created: ${noteDate}
             </div>
         `;
+
+        // Add audio functionality for notes
+        setTimeout(async () => {
+            if (typeof window.AudioUIHelper !== 'undefined' && note.id) {
+                // Combine selected text and note content for audio
+                const audioContent = `Selected text: ${note.selected_text}. Your note: ${note.note_content}`;
+                if (audioContent.trim()) {
+                    await window.AudioUIHelper.addNoteAudioButton(
+                        note.id,
+                        audioContent,
+                        content
+                    );
+                }
+            }
+        }, 100);
 
         overlay.classList.add('show');
         bubble.classList.add('show');
@@ -2142,6 +2189,11 @@ class BookReader {
         
         modal.classList.remove('show');
         overlay.classList.remove('show');
+        
+        // Stop any audio playback when closing Aristo modal
+        if (typeof window.AudioUIHelper !== 'undefined') {
+            window.AudioUIHelper.stopAllAudio();
+        }
         
         // Re-enable body scrolling
         document.body.style.overflow = 'auto';

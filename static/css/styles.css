@@ -37,13 +37,207 @@
     top: 80px;
     z-index: 100;
     box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+}
+
+/* Expanded Audio View */
+.audiobook-panel.audio-expanded {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    background: var(--bg-color);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+}
+
+.audiobook-panel.audio-expanded .audio-controls {
+    transform: scale(1.2);
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.audiobook-panel.audio-expanded .audio-controls .sleek-settings {
+    display: none;
+}
+
+/* Hide settings button in fullscreen mode */
+.audio-fullscreen-mode #audioSettingsBtn {
+    display: none !important;
+}
+
+/* Hide expand button in fullscreen mode - users can exit with Escape key */
+.audio-fullscreen-mode #audioExpandBtn {
+    display: none !important;
+}
+
+/* Exit fullscreen button - only visible in fullscreen mode */
+.audio-exit-fullscreen-btn {
+    display: none;
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    width: 48px;
+    height: 48px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.audio-exit-fullscreen-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: scale(1.05);
+}
+
+.audio-fullscreen-mode .audio-exit-fullscreen-btn {
+    display: flex !important;
+}
+
+.audiobook-panel.audio-expanded .audio-progress {
+    width: 100%;
+    max-width: 800px;
+    transform: scale(1.1);
+}
+
+/* Scrolling Text Container - only visible in fullscreen */
+.audio-scrolling-text {
+    display: none;
+    width: 100%;
+    max-width: 900px;
+    height: 300px;
+    margin: 2rem 0;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    backdrop-filter: blur(10px);
+    scroll-behavior: smooth;
+}
+
+.audiobook-panel.audio-expanded .audio-scrolling-text {
+    display: block;
+}
+
+.audio-scrolling-text-content {
+    font-family: 'Crimson Text', serif;
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: var(--text-color);
+    opacity: 0.9;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    padding: 1rem 0;
+    min-height: 100%;
+    /* Remove transform transition to avoid conflicts with manual scrolling */
+}
+
+/* Custom scrollbar for the text container */
+.audio-scrolling-text::-webkit-scrollbar {
+    width: 8px;
+}
+
+.audio-scrolling-text::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.audio-scrolling-text::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+.audio-scrolling-text::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Highlight current segment being read */
+.audio-scrolling-text .current-segment {
+    background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+    background-size: 100% 3px;
+    background-repeat: no-repeat;
+    background-position: 0 bottom;
+    padding: 0.2rem 0.4rem;
+    margin: -0.2rem -0.4rem;
+    border-radius: 4px;
+    animation: currentSegmentGlow 2s ease-in-out infinite;
+}
+
+/* Style for display segments */
+.audio-scrolling-text .display-segment {
+    display: inline;
+    transition: all 0.3s ease;
+}
+
+@keyframes currentSegmentGlow {
+    0%, 100% { 
+        background-color: rgba(132, 250, 176, 0.2);
+        transform: scale(1);
+    }
+    50% { 
+        background-color: rgba(132, 250, 176, 0.4);
+        transform: scale(1.01);
+    }
+}
+
+/* Fade effect at top and bottom */
+.audio-scrolling-text::before,
+.audio-scrolling-text::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 40px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.audio-scrolling-text::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--bg-color), transparent);
+}
+
+.audio-scrolling-text::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--bg-color), transparent);
+}
+
+.audio-fullscreen-mode {
+    overflow: hidden;
 }
 
 .audio-controls {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
     margin-bottom: 1rem;
+}
+
+.audio-controls-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex: 1;
 }
 
 .audio-btn {
@@ -59,6 +253,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    position: relative;
 }
 
 .audio-btn:hover:not(:disabled) {
@@ -72,9 +267,57 @@
     opacity: 0.6;
 }
 
-.audio-btn.play-btn {
+.audio-btn.main-play-btn {
     width: 56px;
     height: 56px;
+}
+
+.audio-btn.sleek-settings {
+    width: 36px;
+    height: 36px;
+    background: var(--hover-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    margin-right: auto;
+}
+
+.audio-btn.sleek-settings:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.audio-btn.expand-btn {
+    width: 36px;
+    height: 36px;
+    background: var(--hover-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.audio-btn.expand-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.audio-btn.rewind-btn,
+.audio-btn.forward-btn {
+    width: 44px;
+    height: 44px;
+    position: relative;
+}
+
+.skip-text {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    font-weight: bold;
+    font-family: 'Inter', sans-serif;
+    fill: currentColor;
+    pointer-events: none;
 }
 
 .audio-btn svg {
@@ -245,8 +488,75 @@
         top: 0;
     }
     
+    .audiobook-panel.audio-expanded {
+        padding: 1rem;
+    }
+    
+    .audiobook-panel.audio-expanded .audio-controls {
+        transform: scale(1.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .audiobook-panel.audio-expanded .expand-btn {
+        top: 1rem !important;
+        right: 1rem !important;
+        transform: scale(1.1) !important;
+    }
+    
+    .audio-fullscreen-mode #audioExpandBtn {
+        top: 1rem !important;
+        right: 1rem !important;
+        transform: scale(1.1) !important;
+    }
+    
+    /* Exit fullscreen button on mobile */
+    .audio-exit-fullscreen-btn {
+        top: 1rem !important;
+        right: 1rem !important;
+        width: 44px !important;
+        height: 44px !important;
+        font-size: 1.25rem !important;
+    }
+    
+    .audiobook-panel.audio-expanded .audio-progress {
+        transform: scale(1.05);
+    }
+    
+    /* Mobile scrolling text adjustments */
+    .audio-scrolling-text {
+        height: 200px !important;
+        margin: 1rem 0 !important;
+        padding: 1rem !important;
+    }
+    
+    .audio-scrolling-text-content {
+        font-size: 1rem !important;
+        line-height: 1.6 !important;
+    }
+    
     .audio-controls {
-        justify-content: center;
+        justify-content: space-between;
+        padding: 0.5rem;
+    }
+    
+    .sleek-settings,
+    .expand-btn {
+        font-size: 14px;
+        padding: 0.3rem 0.6rem;
+    }
+    
+    .audio-controls-center {
+        gap: 0.5rem;
+    }
+    
+    .audio-controls-center button {
+        font-size: 12px;
+        padding: 0.3rem 0.6rem;
+        min-width: 32px;
+    }
+    
+    .skip-text {
+        font-size: 10px;
     }
     
     .audio-progress {

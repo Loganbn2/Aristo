@@ -1026,7 +1026,12 @@ class DatabaseService {
 
     // New methods for chapter-based audio storage
     static async saveChapterAudio(chapterId, audioData, voice, model) {
-        console.log('💾 Saving chapter audio:', chapterId);
+        console.log('💾 Saving chapter audio:', {
+            chapterId: chapterId,
+            voice: voice,
+            model: model,
+            audioDataLength: audioData ? audioData.length : 0
+        });
         await ensureSupabaseReady();
         
         if (!isSupabaseConfigured()) {
@@ -1034,7 +1039,37 @@ class DatabaseService {
             return false;
         }
 
+        // Validate inputs
+        if (!chapterId) {
+            console.error('❌ No chapter ID provided');
+            return false;
+        }
+        
+        if (!audioData) {
+            console.error('❌ No audio data provided');
+            return false;
+        }
+        
+        if (!voice || !model) {
+            console.error('❌ Voice or model not provided');
+            return false;
+        }
+
         try {
+            // Test if audioData is valid JSON
+            try {
+                const testParse = JSON.parse(audioData);
+                if (!Array.isArray(testParse)) {
+                    console.error('❌ Audio data is not a valid JSON array');
+                    return false;
+                }
+                console.log(`✅ Audio data validated: ${testParse.length} segments`);
+            } catch (jsonError) {
+                console.error('❌ Audio data is not valid JSON:', jsonError);
+                return false;
+            }
+
+            console.log('🔄 Updating chapter with audio data...');
             const { data, error } = await supabaseClient
                 .from('chapters')
                 .update({
@@ -1043,15 +1078,29 @@ class DatabaseService {
                     audio_model: model,
                     audio_generated_at: new Date().toISOString()
                 })
-                .eq('id', chapterId);
+                .eq('id', chapterId)
+                .select('id, audio_voice, audio_model, audio_generated_at');
 
             if (error) {
-                console.error('❌ Error saving chapter audio:', error);
+                console.error('❌ Supabase error saving chapter audio:', error);
+                console.error('   Error code:', error.code);
+                console.error('   Error message:', error.message);
+                console.error('   Error details:', error.details);
                 return false;
             }
 
-            console.log('✅ Chapter audio saved successfully');
-            return true;
+            if (data && data.length > 0) {
+                console.log('✅ Chapter audio saved successfully:', {
+                    chapter_id: data[0].id,
+                    voice: data[0].audio_voice,
+                    model: data[0].audio_model,
+                    generated_at: data[0].audio_generated_at
+                });
+                return true;
+            } else {
+                console.warn('⚠️ Save operation completed but no data returned - chapter may not exist');
+                return false;
+            }
         } catch (error) {
             console.error('❌ Error saving chapter audio:', error);
             return false;
@@ -1068,32 +1117,311 @@ class DatabaseService {
         }
 
         try {
-            const { data, error } = await supabaseClient
+            // First try to get audio with matching voice and model
+            let { data, error } = await supabaseClient
                 .from('chapters')
                 .select('audio_data, audio_voice, audio_model, audio_generated_at')
                 .eq('id', chapterId)
+                .eq('audio_voice', requiredVoice)
+                .eq('audio_model', requiredModel)
+                .not('audio_data', 'is', null)
                 .single();
             
-            if (error && error.code !== 'PGRST116') {
-                console.error('❌ Error fetching chapter audio:', error);
+            if (!error && data && data.audio_data) {
+                console.log(`✅ Found matching chapter audio (exact voice/model match)`);
+                return data;
+            }
+            
+            // If no exact match, try to get ANY existing audio for this chapter
+            ({ data, error } = await supabaseClient
+                .from('chapters')
+                .select('audio_data, audio_voice, audio_model, audio_generated_at')
+                .eq('id', chapterId)
+                .not('audio_data', 'is', null)
+                .order('audio_generated_at', { ascending: false })
+                .limit(1)
+                .single());
+            
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    console.log('📭 Chapter not found or no audio data available');
+                } else {
+                    console.error('❌ Error fetching chapter audio:', error);
+                }
                 return null;
             }
             
-            if (data && data.audio_data && data.audio_voice === requiredVoice && data.audio_model === requiredModel) {
-                console.log('✅ Found matching chapter audio:', {
+            if (!data || !data.audio_data) {
+                console.log('📭 No chapter audio data found');
+                return null;
+            }
+            
+            // Validate audio data format (should be valid JSON)
+            try {
+                const audioDataTest = typeof data.audio_data === 'string' 
+                    ? JSON.parse(data.audio_data)
+                    : data.audio_data;
+                
+                if (!Array.isArray(audioDataTest)) {
+                    console.log('⚠️ Audio data is not in expected array format');
+                    return null;
+                }
+                
+                if (audioDataTest.length === 0) {
+                    console.log('⚠️ Audio data array is empty');
+                    return null;
+                }
+                
+                console.log(`✅ Found existing chapter audio (different voice/model):`, {
                     voice: data.audio_voice,
                     model: data.audio_model,
                     generated_at: data.audio_generated_at,
-                    audio_size: data.audio_data ? data.audio_data.length : 0
+                    requestedVoice: requiredVoice,
+                    requestedModel: requiredModel,
+                    audio_segments: audioDataTest.length
                 });
+                
                 return data;
-            } else {
-                console.log('📭 No matching chapter audio found - voice/model mismatch or no audio');
+                
+            } catch (parseError) {
+                console.error('❌ Audio data is not valid JSON:', parseError);
                 return null;
             }
         } catch (error) {
             console.error('❌ Error accessing chapter audio:', error);
             return null;
+        }
+    }
+
+    // Audio for Notes
+    static async getNoteAudio(noteId, voice, model) {
+        console.log(`🔍 Getting note audio for note ID: ${noteId}, voice: ${voice}, model: ${model}`);
+        
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, returning null for note audio');
+            return null;
+        }
+        
+        try {
+            // First try to get audio with matching voice and model
+            let { data, error } = await supabaseClient
+                .from('notes')
+                .select('id, selected_text, note_content, audio_data, audio_voice, audio_model, audio_generated_at')
+                .eq('id', noteId)
+                .eq('audio_voice', voice)
+                .eq('audio_model', model)
+                .not('audio_data', 'is', null)
+                .single();
+            
+            if (!error && data && data.audio_data) {
+                console.log(`✅ Found matching note audio (exact voice/model match)`);
+                return data;
+            }
+            
+            // If no exact match, try to get ANY existing audio for this note
+            ({ data, error } = await supabaseClient
+                .from('notes')
+                .select('id, selected_text, note_content, audio_data, audio_voice, audio_model, audio_generated_at')
+                .eq('id', noteId)
+                .not('audio_data', 'is', null)
+                .order('audio_generated_at', { ascending: false })
+                .limit(1)
+                .single());
+            
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    console.log('📭 No note audio found at all');
+                    return null;
+                }
+                console.error('❌ Error querying note audio:', error);
+                return null;
+            }
+            
+            if (!data || !data.audio_data) {
+                console.log('📭 No audio data found for note');
+                return null;
+            }
+            
+            // Validate audio data format
+            try {
+                const audioDataTest = typeof data.audio_data === 'string' 
+                    ? data.audio_data
+                    : JSON.stringify(data.audio_data);
+                
+                console.log(`✅ Found existing note audio (different voice/model):`, {
+                    noteId: data.id,
+                    voice: data.audio_voice,
+                    model: data.audio_model,
+                    generated_at: data.audio_generated_at,
+                    requestedVoice: voice,
+                    requestedModel: model,
+                    hasAudioData: !!audioDataTest
+                });
+                
+                return data;
+                
+            } catch (parseError) {
+                console.error('❌ Note audio data is not valid:', parseError);
+                return null;
+            }
+            
+        } catch (error) {
+            console.error('❌ Error accessing note audio:', error);
+            return null;
+        }
+    }
+
+    static async saveNoteAudio(noteId, audioData, voice, model) {
+        console.log(`💾 Saving note audio for note ID: ${noteId}, voice: ${voice}, model: ${model}`);
+        
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, cannot save note audio');
+            return false;
+        }
+        
+        try {
+            const { data, error } = await supabaseClient
+                .from('notes')
+                .update({
+                    audio_data: audioData,
+                    audio_voice: voice,
+                    audio_model: model,
+                    audio_generated_at: new Date().toISOString()
+                })
+                .eq('id', noteId)
+                .select()
+                .single();
+            
+            if (error) {
+                console.error('❌ Error saving note audio:', error);
+                return false;
+            }
+            
+            console.log(`✅ Successfully saved note audio for note ${noteId}`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error saving note audio:', error);
+            return false;
+        }
+    }
+
+    // Audio for Highlights
+    static async getHighlightAudio(highlightId, voice, model) {
+        console.log(`🔍 Getting highlight audio for highlight ID: ${highlightId}, voice: ${voice}, model: ${model}`);
+        
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, returning null for highlight audio');
+            return null;
+        }
+        
+        try {
+            // First try to get audio with matching voice and model
+            let { data, error } = await supabaseClient
+                .from('highlights')
+                .select('id, selected_text, content, audio_data, audio_voice, audio_model, audio_generated_at')
+                .eq('id', highlightId)
+                .eq('audio_voice', voice)
+                .eq('audio_model', model)
+                .not('audio_data', 'is', null)
+                .single();
+            
+            if (!error && data && data.audio_data) {
+                console.log(`✅ Found matching highlight audio (exact voice/model match)`);
+                return data;
+            }
+            
+            // If no exact match, try to get ANY existing audio for this highlight
+            ({ data, error } = await supabaseClient
+                .from('highlights')
+                .select('id, selected_text, content, audio_data, audio_voice, audio_model, audio_generated_at')
+                .eq('id', highlightId)
+                .not('audio_data', 'is', null)
+                .order('audio_generated_at', { ascending: false })
+                .limit(1)
+                .single());
+            
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    console.log('📭 No highlight audio found at all');
+                    return null;
+                }
+                console.error('❌ Error querying highlight audio:', error);
+                return null;
+            }
+            
+            if (!data || !data.audio_data) {
+                console.log('📭 No audio data found for highlight');
+                return null;
+            }
+            
+            // Validate audio data format
+            try {
+                const audioDataTest = typeof data.audio_data === 'string' 
+                    ? data.audio_data
+                    : JSON.stringify(data.audio_data);
+                
+                console.log(`✅ Found existing highlight audio (different voice/model):`, {
+                    highlightId: data.id,
+                    voice: data.audio_voice,
+                    model: data.audio_model,
+                    generated_at: data.audio_generated_at,
+                    requestedVoice: voice,
+                    requestedModel: model,
+                    hasAudioData: !!audioDataTest
+                });
+                
+                return data;
+                
+            } catch (parseError) {
+                console.error('❌ Highlight audio data is not valid:', parseError);
+                return null;
+            }
+            
+        } catch (error) {
+            console.error('❌ Error accessing highlight audio:', error);
+            return null;
+        }
+    }
+
+    static async saveHighlightAudio(highlightId, audioData, voice, model) {
+        console.log(`💾 Saving highlight audio for highlight ID: ${highlightId}, voice: ${voice}, model: ${model}`);
+        
+        await ensureSupabaseReady();
+        
+        if (!isSupabaseConfigured()) {
+            console.log('⚠️ Supabase not configured, cannot save highlight audio');
+            return false;
+        }
+        
+        try {
+            const { data, error } = await supabaseClient
+                .from('highlights')
+                .update({
+                    audio_data: audioData,
+                    audio_voice: voice,
+                    audio_model: model,
+                    audio_generated_at: new Date().toISOString()
+                })
+                .eq('id', highlightId)
+                .select()
+                .single();
+            
+            if (error) {
+                console.error('❌ Error saving highlight audio:', error);
+                return false;
+            }
+            
+            console.log(`✅ Successfully saved highlight audio for highlight ${highlightId}`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error saving highlight audio:', error);
+            return false;
         }
     }
 }

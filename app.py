@@ -235,6 +235,10 @@ def test_supabase():
 def test_frontend():
     return render_template('test_frontend.html')
 
+@app.route('/test_audio_persistence.html')
+def test_audio_persistence():
+    return render_template('test_audio_persistence.html')
+
 @app.route('/api/find-relevant-text', methods=['POST'])
 def find_relevant_text():
     """Find the most relevant text snippet from chapter content using AI"""

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio UI Test</title>
+    <link rel="stylesheet" href="static/css/styles.css">
+</head>
+<body>
+    <div class="audiobook-panel">
+        <div class="audio-controls">
+            <button class="sleek-settings">⚙️</button>
+            
+            <div class="audio-controls-center">
+                <button class="skip-back">⏪<br><span class="skip-text">30s</span></button>
+                <button class="play-pause">▶️</button>
+                <button class="skip-forward">⏩<br><span class="skip-text">30s</span></button>
+            </div>
+        </div>
+        
+        <div class="audio-progress">
+            <div class="progress-container">
+                <input type="range" class="progress-bar" value="0" max="100">
+            </div>
+            <div class="progress-info">
+                <span class="current-time">00:00</span>
+                <span class="duration">00:00</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
